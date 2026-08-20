@@ -35,7 +35,7 @@ jobs:
       - name: QEMU boot smoke test
         run: make qemu-smoke
         env:
-          MOONLIGHTOS_QEMU_LOG: build/out/qemu-smoke.log
+          MOONLIGHTOS_QEMU_LOG: /tmp/moonlightos-qemu-smoke.log
       - name: Upload failed boot diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -44,7 +44,7 @@ jobs:
           path: |
             build/out/moonlightos-0.1.0-alpha-amd64.iso
             build/out/moonlightos-0.1.0-alpha-amd64.iso.sha256
-            build/out/qemu-smoke.log
+            /tmp/moonlightos-qemu-smoke.log
           if-no-files-found: warn
           retention-days: 2
       - name: Upload ISO and checksum
