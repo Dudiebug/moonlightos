@@ -24,7 +24,9 @@ Intel VA-API, display audio, gamepad, USB/IP hardware, or streaming.
 
 The test boots through UEFI rather than injecting the kernel directly. It must
 reach the launcher marker without depending on DHCP. GRUB also mirrors output
-to a 115200-baud serial console so bootloader failures appear in CI logs.
+to a 115200-baud serial console so bootloader failures appear in CI logs. The
+test creates a disposable writable copy of `OVMF_VARS`; supplying OVMF code
+without its variable store is not a valid UEFI test setup.
 
 ## Installed-system QEMU procedure
 

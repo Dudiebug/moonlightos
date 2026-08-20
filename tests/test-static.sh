@@ -30,6 +30,8 @@ rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
+rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
+rg -q 'unit=1,file=' tests/qemu-smoke.sh
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address

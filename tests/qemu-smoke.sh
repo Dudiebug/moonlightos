@@ -11,16 +11,49 @@ if [[ -n ${MOONLIGHTOS_QEMU_LOG:-} ]]; then
   install -D -m 0644 /dev/null "$log"
 else
   log=$(mktemp)
-  trap 'find "$log" -delete' EXIT
 fi
+temporary_files=()
+[[ -z ${MOONLIGHTOS_QEMU_LOG:-} ]] && temporary_files+=("$log")
+cleanup() {
+  ((${#temporary_files[@]} == 0)) || find "${temporary_files[@]}" -delete
+}
+trap cleanup EXIT
+
 args=(
   -m 2048 -smp 2 -boot d -cdrom "$ISO"
   -device virtio-vga -display none -serial stdio -no-reboot
   -netdev "user,id=net0" -device "e1000,netdev=net0"
 )
 [[ -r /dev/kvm ]] && args=(-enable-kvm -cpu host "${args[@]}")
-if [[ -r /usr/share/OVMF/OVMF_CODE.fd ]]; then
-  args=(-drive "if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd" "${args[@]}")
+
+# OVMF requires a private writable variable store in addition to its read-only
+# code image. A code-only pflash drive can stall before GRUB with no serial log.
+ovmf_code=
+ovmf_vars_template=
+for pair in \
+  '/usr/share/OVMF/OVMF_CODE_4M.fd|/usr/share/OVMF/OVMF_VARS_4M.fd' \
+  '/usr/share/OVMF/OVMF_CODE.fd|/usr/share/OVMF/OVMF_VARS.fd' \
+  '/usr/share/pve-edk2-firmware/OVMF_CODE_4M.fd|/usr/share/pve-edk2-firmware/OVMF_VARS_4M.fd'; do
+  code=${pair%%|*}
+  vars=${pair#*|}
+  if [[ -r "$code" && -r "$vars" ]]; then
+    ovmf_code=$code
+    ovmf_vars_template=$vars
+    break
+  fi
+done
+if [[ -n "$ovmf_code" ]]; then
+  ovmf_vars=$(mktemp)
+  temporary_files+=("$ovmf_vars")
+  cp "$ovmf_vars_template" "$ovmf_vars"
+  args=(
+    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf_code"
+    -drive "if=pflash,format=raw,unit=1,file=$ovmf_vars"
+    "${args[@]}"
+  )
+else
+  echo 'OVMF code/variable pair not found; UEFI smoke test cannot run.' >&2
+  exit 69
 fi
 
 qemu-system-x86_64 "${args[@]}" > "$log" 2>&1 &
