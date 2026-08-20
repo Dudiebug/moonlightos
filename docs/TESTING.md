@@ -28,6 +28,10 @@ to a 115200-baud serial console so bootloader failures appear in CI logs. The
 test creates a disposable writable copy of `OVMF_VARS`; supplying OVMF code
 without its variable store is not a valid UEFI test setup.
 
+On failure, CI retains the serial log and a QEMU framebuffer screenshot. The
+test also extracts `/boot/grub/grub.cfg` from the ISO and verifies the appliance
+timeout and serial settings before starting the VM.
+
 ## Installed-system QEMU procedure
 
 Create a disposable 24 GB disk, boot the ISO with a graphical QEMU display,
