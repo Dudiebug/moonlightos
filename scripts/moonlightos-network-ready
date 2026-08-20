@@ -1,0 +1,14 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+deadline=$((SECONDS + 90))
+while ((SECONDS < deadline)); do
+  if ip -4 route show default | grep -q '^default ' && ip -brief -4 address show up | grep -q 'UP.*[0-9]'; then
+    echo "$(date --iso-8601=seconds) wired network ready"
+    ip -brief -4 address show up
+    exit 0
+  fi
+  sleep 1
+done
+echo "$(date --iso-8601=seconds) network readiness timed out; launcher will still start" >&2
+exit 0

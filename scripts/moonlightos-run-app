@@ -1,0 +1,69 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+APP=${1:-}
+# shellcheck source=config/default/moonlightos
+source /etc/default/moonlightos
+LOG_DIR=${MOONLIGHTOS_LOG_DIR:-/var/log/moonlightos}
+DATA_DIR=${MOONLIGHTOS_DATA_DIR:-/var/lib/moonlightos}
+mkdir -p "$LOG_DIR" "$DATA_DIR/home/.config" "$DATA_DIR/home/.cache"
+
+case "$APP" in
+  moonlight)
+    request=/run/moonlightos/start-moonlight
+    binary=/opt/moonlightos/apps/moonlight.AppImage
+    ;;
+  chiaki-ng)
+    request=/run/moonlightos/start-chiaki
+    binary=/opt/moonlightos/apps/chiaki-ng.AppImage
+    ;;
+  *)
+    echo "Unknown application: $APP" >&2
+    exit 64
+    ;;
+esac
+rm -f -- "$request"
+
+printf '%s starting %s\n' "$(date --iso-8601=seconds)" "$APP"
+set +e
+if [[ "$APP" == moonlight ]]; then
+  # Moonlight Qt has no production-grade standalone DRM backend. Native
+  # Wayland under Cage avoids XWayland and retains VA-API access.
+  host=$(moonlightos-host-address --quiet 2>/dev/null || true)
+  profile_app=$(python3 - "$DATA_DIR/config.ini" <<'PY'
+import configparser, sys
+c=configparser.ConfigParser(); c.read(sys.argv[1])
+print(c.get('host:gaming-pc','app',fallback='').strip())
+PY
+)
+  if [[ -n "$host" ]]; then
+    echo "Selected Sunshine address: $host ($(moonlightos-host-address 2>/dev/null || true))"
+  fi
+  if [[ -n "$host" && -n "$profile_app" ]]; then
+    QT_QPA_PLATFORM=wayland "$binary" stream "$host" "$profile_app"
+  else
+    QT_QPA_PLATFORM=wayland "$binary"
+  fi
+  rc=$?
+else
+  gamescope_enabled=${MOONLIGHTOS_CHIAKI_GAMESCOPE:-0}
+  if [[ -r "$DATA_DIR/config.ini" ]]; then
+    configured=$(sed -n 's/^[[:space:]]*gamescope[[:space:]]*=[[:space:]]*//p' "$DATA_DIR/config.ini" | tail -1)
+    [[ "$configured" == true ]] && gamescope_enabled=1
+  fi
+  if [[ "$gamescope_enabled" == 1 ]] && command -v gamescope >/dev/null; then
+    gamescope -f -- "$binary"
+  else
+    QT_QPA_PLATFORM=wayland SDL_AUDIODRIVER=pipewire "$binary"
+  fi
+  rc=$?
+fi
+set -e
+
+if ((rc == 0)); then
+  printf '%s %s exited normally; returning to launcher\n' "$(date --iso-8601=seconds)" "$APP"
+else
+  printf '%s %s crashed/failed with status %d; systemd will retry up to three times\n' \
+    "$(date --iso-8601=seconds)" "$APP" "$rc" >&2
+fi
+exit "$rc"

@@ -1,0 +1,16 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+pids=()
+cleanup() {
+  if ((${#pids[@]})); then
+    kill "${pids[@]}" 2>/dev/null || true
+    wait "${pids[@]}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+/usr/bin/pipewire & pids+=("$!")
+/usr/bin/pipewire-pulse & pids+=("$!")
+/usr/bin/wireplumber & pids+=("$!")
+wait -n "${pids[@]}"

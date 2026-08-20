@@ -1,0 +1,28 @@
+#!/bin/bash
+set -uo pipefail
+
+url_file=/run/moonlightos/tailscale-auth-url
+echo 'Tailscale enrollment'
+echo
+echo 'Waiting for a local authentication URL...'
+for _ in $(seq 1 120); do
+  if [[ -s "$url_file" ]]; then
+    echo
+    echo 'Open this URL on a trusted device:'
+    cat "$url_file"
+    echo
+    echo 'This URL is short-lived and is not written to persistent logs.'
+    echo 'The window may be closed after authentication completes.'
+    read -r _
+    exit 0
+  fi
+  if systemctl is-failed --quiet moonlightos-tailscale-enroll.service; then
+    echo 'Enrollment failed. Run moonlightos-tailscale-diagnostics.'
+    read -r _
+    exit 1
+  fi
+  sleep 1
+done
+echo 'No URL appeared before the local timeout.'
+read -r _
+exit 1

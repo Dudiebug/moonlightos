@@ -1,0 +1,68 @@
+#!/bin/bash
+set -uo pipefail
+
+watch_mode=0
+[[ ${1:-} == --watch ]] && watch_mode=1
+
+report() {
+  clear 2>/dev/null || true
+  echo 'MoonlightOS diagnostics'
+  echo "Generated: $(date --iso-8601=seconds)"
+  echo
+  echo '== OS =='
+  cat /etc/os-release 2>/dev/null | grep -E '^(PRETTY_NAME|VERSION_ID)=' || true
+  printf 'MoonlightOS: '; cat /etc/moonlightos-version 2>/dev/null || echo unknown
+  uname -a
+  echo
+  echo '== CPU =='
+  lscpu 2>/dev/null | grep -E '^(Model name|Architecture|CPU\(s\)|Thread|Core)' || true
+  echo
+  echo '== GPU / driver =='
+  lspci -nnk 2>/dev/null | grep -A3 -Ei 'VGA|Display' || true
+  lsmod 2>/dev/null | grep '^i915' || echo 'i915 module not shown'
+  echo
+  echo '== Vulkan =='
+  vulkaninfo --summary 2>&1 | sed -n '1,80p' || true
+  echo
+  echo '== VA-API decoders =='
+  vainfo 2>&1 | grep -E 'VAProfile|Driver version|libva info' || true
+  echo
+  echo '== Audio =='
+  wpctl status 2>&1 | sed -n '1,100p' || true
+  aplay -l 2>&1 || true
+  echo
+  echo '== Network =='
+  nmcli device status 2>&1 || true
+  ip -brief -4 address 2>&1 || true
+  ip route 2>&1 || true
+  echo
+  echo '== USB =='
+  lsusb 2>&1 || true
+  echo
+  echo '== USB/IP =='
+  moonlightos-usbip status 2>&1 || true
+  echo
+  moonlightos-tailscale-diagnostics 2>&1 || true
+  echo
+  echo '== Display connectors / modes =='
+  for connector in /sys/class/drm/card*-*/status; do
+    [[ -e "$connector" ]] || continue
+    base=${connector%/status}
+    printf '%s: %s\n' "${base##*/}" "$(cat "$connector")"
+    sed 's/^/  /' "$base/modes" 2>/dev/null || true
+  done
+  echo
+  echo '== Services =='
+  systemctl --no-pager --plain --state=failed 2>&1 || true
+}
+
+if ((watch_mode)); then
+  while true; do report; echo; echo 'Refresh: 5 seconds. Close with Alt+F4.'; sleep 5; done
+else
+  report
+  if [[ -d /var/log/moonlightos ]]; then
+    outfile=/var/log/moonlightos/diagnostics-$(date +%Y%m%d-%H%M%S).txt
+    report > "$outfile" 2>&1
+    echo "Saved: $outfile"
+  fi
+fi

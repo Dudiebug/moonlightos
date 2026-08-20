@@ -1,0 +1,38 @@
+name: build-and-smoke-test
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes live-build curl ca-certificates xorriso \
+            squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools dosfstools \
+            qemu-system-x86 ovmf
+      - name: Source tests
+        run: make test
+      - name: Build ISO
+        run: sudo make build
+      - name: QEMU boot smoke test
+        run: make qemu-smoke
+      - name: Upload ISO and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: moonlightos-0.1.0-alpha-amd64
+          path: |
+            build/out/moonlightos-0.1.0-alpha-amd64.iso
+            build/out/moonlightos-0.1.0-alpha-amd64.iso.sha256
+          if-no-files-found: error

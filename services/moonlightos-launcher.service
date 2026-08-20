@@ -1,0 +1,37 @@
+[Unit]
+Description=MoonlightOS controller-friendly launcher
+Requires=seatd.service
+Wants=moonlightos-network-ready.service moonlightos-audio.service
+After=seatd.service moonlightos-network-ready.service moonlightos-audio.service systemd-user-sessions.service
+Conflicts=getty@tty1.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=moonlightos
+Group=moonlightos
+SupplementaryGroups=audio input render video seat
+Environment=HOME=/var/lib/moonlightos/home
+Environment=XDG_CONFIG_HOME=/var/lib/moonlightos/home/.config
+Environment=XDG_DATA_HOME=/var/lib/moonlightos/home/.local/share
+Environment=XDG_CACHE_HOME=/var/lib/moonlightos/home/.cache
+Environment=XDG_RUNTIME_DIR=/run/moonlightos
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=LIBSEAT_BACKEND=seatd
+Environment=QT_QPA_PLATFORM=wayland
+RuntimeDirectory=moonlightos
+RuntimeDirectoryMode=0750
+StateDirectory=moonlightos
+LogsDirectory=moonlightos
+ExecStart=/usr/bin/cage -s -- /usr/libexec/moonlightos-launcher
+ExecStartPre=/bin/sh -c 'printf "MOONLIGHTOS_LAUNCHER_STARTING\\n" > /dev/ttyS0 2>/dev/null || true'
+Restart=always
+RestartSec=2
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=append:/var/log/moonlightos/launcher.log
+StandardError=append:/var/log/moonlightos/launcher.log
+
+[Install]
+WantedBy=graphical.target

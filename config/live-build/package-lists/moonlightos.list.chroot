@@ -1,0 +1,59 @@
+# Base, boot, init, and network
+linux-image-amd64
+live-boot
+live-config
+systemd-sysv
+dbus-user-session
+sudo
+network-manager
+iproute2
+iputils-ping
+ethtool
+curl
+ca-certificates
+nftables
+kmod
+udev
+
+# Intel graphics, Vulkan, VA-API, and diagnostics
+firmware-intel-graphics
+mesa-vulkan-drivers
+libgl1-mesa-dri
+libegl-mesa0
+vulkan-tools
+libva2
+vainfo
+intel-media-va-driver
+intel-gpu-tools
+
+# Kiosk Wayland and applications
+cage
+seatd
+xwayland
+foot
+gamescope/trixie-backports
+python3
+python3-gi
+python3-evdev
+gir1.2-gtk-4.0
+libfuse2t64
+fuse3
+libhidapi-hidraw0
+
+# Audio and input
+pipewire
+pipewire-audio
+wireplumber
+alsa-utils
+libspa-0.2-modules
+joystick
+
+# USB/IP and diagnostics
+usbip
+usbutils
+pciutils
+jq
+tailscale=1.102.3
+
+# Debian Installer integration
+debian-installer-launcher

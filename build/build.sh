@@ -1,0 +1,35 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+WORK="$ROOT/build/work"
+OUT="$ROOT/build/out"
+ISO="$OUT/moonlightos-0.1.0-alpha-amd64.iso"
+
+[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'Run with sudo: sudo make build' >&2; exit 1; }
+command -v lb >/dev/null || { echo 'live-build is required (apt install live-build)' >&2; exit 1; }
+
+mkdir -p "$OUT"
+cd "$WORK"
+export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git -C "$ROOT" log -1 --format=%ct 2>/dev/null || date +%s)}
+
+lb config noauto \
+  --mode debian \
+  --distribution trixie \
+  --architectures amd64 \
+  --binary-images iso-hybrid \
+  --archive-areas 'main contrib non-free-firmware' \
+  --debian-installer live \
+  --debian-installer-gui false \
+  --bootappend-live 'boot=live components persistence hostname=moonlightos username=moonlightos locales=en_US.UTF-8 keyboard-layouts=us console=tty1 console=ttyS0,115200n8' \
+  --iso-application 'MoonlightOS streaming appliance' \
+  --iso-publisher 'MoonlightOS Project' \
+  --iso-volume 'MOONLIGHTOS' \
+  --image-name 'moonlightos-0.1.0-alpha' \
+  --apt-recommends false \
+  --memtest none
+
+lb build
+install -m 0644 moonlightos-0.1.0-alpha-amd64.hybrid.iso "$ISO"
+(cd "$OUT" && sha256sum "$(basename "$ISO")" > "$(basename "$ISO").sha256")
+printf 'ISO: %s\nSHA256: %s.sha256\n' "$ISO" "$ISO"

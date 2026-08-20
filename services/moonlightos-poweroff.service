@@ -1,0 +1,6 @@
+[Unit]
+Description=Poweroff requested by MoonlightOS launcher
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl poweroff

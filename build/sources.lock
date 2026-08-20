@@ -1,0 +1,2 @@
+# name|version-or-date|url|sha256|download filename
+tailscale-archive-keyring|2026-08-20|https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg|3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39|tailscale-archive-keyring.gpg

@@ -1,0 +1,6 @@
+[Unit]
+Description=Reboot requested by MoonlightOS launcher
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl reboot

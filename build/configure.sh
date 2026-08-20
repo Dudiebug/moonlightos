@@ -1,0 +1,45 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+WORK="$ROOT/build/work"
+CHROOT="$WORK/config/includes.chroot"
+
+if [[ -d "$WORK" ]]; then
+  find "$WORK" -depth -mindepth 1 -delete
+fi
+mkdir -p "$WORK/config" "$CHROOT"
+cp -a "$ROOT/config/live-build/." "$WORK/config/"
+cp -a "$ROOT/overlay/." "$CHROOT/"
+install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
+  "$WORK/config/archives/tailscale.key.chroot"
+install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
+  "$CHROOT/usr/share/keyrings/tailscale-archive-keyring.gpg"
+
+install -D -m 0755 "$ROOT/launcher/moonlightos-launcher.py" "$CHROOT/usr/libexec/moonlightos-launcher"
+install -D -m 0755 "$ROOT/launcher/gamepad-nav.py" "$CHROOT/usr/libexec/moonlightos-gamepad-nav"
+install -D -m 0755 "$ROOT/scripts/moonlightos-run-app" "$CHROOT/usr/libexec/moonlightos-run-app"
+install -D -m 0755 "$ROOT/scripts/moonlightos-diagnostics" "$CHROOT/usr/bin/moonlightos-diagnostics"
+install -D -m 0755 "$ROOT/scripts/moonlightos-network-ready" "$CHROOT/usr/libexec/moonlightos-network-ready"
+install -D -m 0755 "$ROOT/scripts/moonlightos-firewall" "$CHROOT/usr/libexec/moonlightos-firewall"
+install -D -m 0755 "$ROOT/scripts/moonlightos-audio" "$CHROOT/usr/libexec/moonlightos-audio"
+install -D -m 0755 "$ROOT/scripts/moonlightos-tailscale" "$CHROOT/usr/sbin/moonlightos-tailscale"
+install -D -m 0755 "$ROOT/scripts/moonlightos-tailscale-diagnostics" "$CHROOT/usr/bin/moonlightos-tailscale-diagnostics"
+install -D -m 0755 "$ROOT/scripts/moonlightos-host-address" "$CHROOT/usr/bin/moonlightos-host-address"
+install -D -m 0755 "$ROOT/scripts/moonlightos-tailscale-enrollment" "$CHROOT/usr/bin/moonlightos-tailscale-enrollment"
+install -D -m 0755 "$ROOT/usbip/moonlightos-usbip" "$CHROOT/usr/sbin/moonlightos-usbip"
+install -D -m 0644 "$ROOT/config/default/moonlightos" "$CHROOT/etc/default/moonlightos"
+install -D -m 0644 "$ROOT/config/nftables/moonlightos.nft" "$CHROOT/etc/moonlightos/nftables.template"
+install -D -m 0644 "$ROOT/usbip/usbip-allowlist.conf" "$CHROOT/etc/moonlightos/usbip-allowlist.conf"
+
+for unit in "$ROOT"/services/*; do
+  install -D -m 0644 "$unit" "$CHROOT/etc/systemd/system/$(basename "$unit")"
+done
+
+install -d -m 0755 "$CHROOT/opt/moonlightos/apps"
+while IFS='|' read -r name _version _url _checksum filename; do
+  [[ -z "$name" || "$name" == \#* ]] && continue
+  install -m 0755 "$ROOT/build/downloads/$filename" "$CHROOT/opt/moonlightos/apps/$filename"
+done < "$ROOT/build/applications.lock"
+
+printf 'Prepared %s\n' "$WORK"

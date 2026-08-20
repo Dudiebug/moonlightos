@@ -1,0 +1,68 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+if ! getent group moonlightos >/dev/null; then
+  groupadd --system moonlightos
+fi
+if ! id moonlightos >/dev/null 2>&1; then
+  useradd --uid 1000 --gid moonlightos --groups audio,input,render,video,seat \
+    --home-dir /var/lib/moonlightos/home --create-home --shell /bin/bash moonlightos
+fi
+
+install -d -o moonlightos -g moonlightos -m 0750 \
+  /var/lib/moonlightos /var/lib/moonlightos/home /var/log/moonlightos
+
+cat > /var/lib/moonlightos/config.ini <<'EOF'
+[launcher]
+autostart = moonlight
+
+[moonlight]
+resolution = 1920x1080
+fps = 60
+codec = auto
+fullscreen = true
+
+[chiaki-ng]
+gamescope = false
+
+[tailscale]
+enabled = false
+accept_dns = true
+ssh_enabled = false
+host_address_mode = auto
+remote_usbip = false
+allowed_usbip_peer =
+node_name =
+
+[host:gaming-pc]
+lan_address =
+tailscale_hostname =
+tailscale_ip =
+address_mode = auto
+app =
+EOF
+
+chown -R moonlightos:moonlightos /var/lib/moonlightos /var/log/moonlightos
+chmod 0640 /var/lib/moonlightos/config.ini
+
+install -d -o root -g root -m 0700 /var/lib/tailscale
+cat > /etc/apt/sources.list.d/tailscale.list <<'EOF'
+deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian trixie main
+EOF
+chmod 0644 /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+systemctl enable NetworkManager.service NetworkManager-wait-online.service
+systemctl enable seatd.service moonlightos-network-ready.service
+systemctl enable moonlightos-firewall.service moonlightos-usbipd.service
+systemctl enable moonlightos-usbip-reconcile.path
+systemctl enable moonlightos-moonlight.path moonlightos-chiaki.path
+systemctl enable moonlightos-reboot.path moonlightos-poweroff.path
+systemctl enable moonlightos-audio.service moonlightos-launcher.service moonlightos-gamepad-nav.service
+systemctl enable tailscaled.service moonlightos-tailscale-enroll.path moonlightos-tailscale-ssh.path
+
+# The standard kernel supplies these modules; load them on the applicable side.
+printf '%s\n' usbip_host uinput tun > /etc/modules-load.d/moonlightos-usbip.conf
+
+
+# Make the appliance boot path visible to serial-only QEMU smoke tests.
+ln -sf /dev/null /etc/systemd/system/getty@tty1.service
