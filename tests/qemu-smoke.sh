@@ -6,8 +6,13 @@ ISO=${1:-$ROOT/build/out/moonlightos-0.1.0-alpha-amd64.iso}
 command -v qemu-system-x86_64 >/dev/null || { echo 'qemu-system-x86_64 is required' >&2; exit 127; }
 [[ -f "$ISO" ]] || { echo "ISO not found: $ISO" >&2; exit 66; }
 
-log=$(mktemp)
-trap 'find "$log" -delete' EXIT
+if [[ -n ${MOONLIGHTOS_QEMU_LOG:-} ]]; then
+  log=$MOONLIGHTOS_QEMU_LOG
+  install -D -m 0644 /dev/null "$log"
+else
+  log=$(mktemp)
+  trap 'find "$log" -delete' EXIT
+fi
 args=(
   -m 2048 -smp 2 -boot d -cdrom "$ISO"
   -device virtio-vga -display none -serial stdio -no-reboot

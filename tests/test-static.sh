@@ -13,6 +13,17 @@ while IFS= read -r file; do
   bash -n "$file"
 done < <(rg -l '^#!/bin/bash' build host scripts tests usbip config/live-build/hooks)
 
+boot_test=$(mktemp -d)
+mkdir -p "$boot_test/binary/boot/grub" "$boot_test/binary/isolinux"
+printf 'menuentry live {}\n' > "$boot_test/binary/boot/grub/grub.cfg"
+printf 'include menu.cfg\nprompt 0\ntimeout 0\n' > "$boot_test/binary/isolinux/isolinux.cfg"
+(cd "$boot_test" && bash "$ROOT/config/live-build/hooks/binary/0100-autoboot.hook.binary")
+rg -q '^set default=0$' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^set timeout=5$' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^timeout 50$' "$boot_test/binary/isolinux/isolinux.cfg"
+! rg -q '^timeout 0$' "$boot_test/binary/isolinux/isolinux.cfg"
+find "$boot_test" -depth -delete
+
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address
 
