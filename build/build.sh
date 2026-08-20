@@ -21,8 +21,10 @@ lb config noauto \
   --archive-areas 'main contrib non-free-firmware' \
   --debian-installer live \
   --debian-installer-gui false \
+  --uefi-secure-boot enable \
   --debootstrap-options '--include=ca-certificates' \
-  --bootappend-live 'boot=live components persistence hostname=moonlightos username=moonlightos locales=en_US.UTF-8 keyboard-layouts=us console=tty1 console=ttyS0,115200n8' \
+  --bootappend-live 'boot=live components persistence ipv6.disable=1 hostname=moonlightos username=moonlightos locales=en_US.UTF-8 keyboard-layouts=us console=tty1 console=ttyS0,115200n8' \
+  --bootappend-install 'ipv6.disable=1' \
   --iso-application 'MoonlightOS streaming appliance' \
   --iso-publisher 'MoonlightOS Project' \
   --iso-volume 'MOONLIGHTOS' \

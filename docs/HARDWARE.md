@@ -19,3 +19,6 @@ Run `vainfo` and confirm decoder profiles before accepting a test result.
 
 4K60 SDR is best effort. Do not infer HDR support from EDID, Vulkan, or VA-API
 alone; HDR requires an end-to-end physical test.
+
+MoonlightOS v0.1 is IPv4-only. IPv6 is disabled on the live kernel command line,
+in the installed GRUB configuration, in NetworkManager, and through sysctl.

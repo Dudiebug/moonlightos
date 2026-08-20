@@ -22,6 +22,10 @@ output, a virtual Ethernet NIC, and UEFI when OVMF is available. Success means
 the boot reached the MoonlightOS launcher service marker. QEMU does not prove
 Intel VA-API, display audio, gamepad, USB/IP hardware, or streaming.
 
+The test boots through UEFI rather than injecting the kernel directly. It must
+reach the launcher marker without depending on DHCP. GRUB also mirrors output
+to a 115200-baud serial console so bootloader failures appear in CI logs.
+
 ## Installed-system QEMU procedure
 
 Create a disposable 24 GB disk, boot the ISO with a graphical QEMU display,

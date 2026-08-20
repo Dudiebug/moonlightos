@@ -19,10 +19,17 @@ printf 'menuentry live {}\n' > "$boot_test/binary/boot/grub/grub.cfg"
 printf 'include menu.cfg\nprompt 0\ntimeout 0\n' > "$boot_test/binary/isolinux/isolinux.cfg"
 (cd "$boot_test" && bash "$ROOT/config/live-build/hooks/binary/0100-autoboot.hook.binary")
 rg -q '^set default=0$' "$boot_test/binary/boot/grub/grub.cfg"
-rg -q '^set timeout=5$' "$boot_test/binary/boot/grub/grub.cfg"
-rg -q '^timeout 50$' "$boot_test/binary/isolinux/isolinux.cfg"
+rg -q '^set timeout=3$' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^terminal_output console serial$' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^timeout 30$' "$boot_test/binary/isolinux/isolinux.cfg"
 ! rg -q '^timeout 0$' "$boot_test/binary/isolinux/isolinux.cfg"
 find "$boot_test" -depth -delete
+
+rg -q -- '--uefi-secure-boot enable' build/build.sh
+rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
+rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
+rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
+! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address

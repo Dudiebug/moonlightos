@@ -8,7 +8,7 @@ Before=moonlightos-launcher.service moonlightos-usbipd.service
 Type=oneshot
 ExecStart=/usr/libexec/moonlightos-network-ready
 RemainAfterExit=yes
-TimeoutStartSec=90
+TimeoutStartSec=20
 StandardOutput=append:/var/log/moonlightos/network.log
 StandardError=append:/var/log/moonlightos/network.log
 

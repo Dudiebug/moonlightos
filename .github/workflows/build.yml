@@ -33,7 +33,11 @@ jobs:
       - name: Build ISO
         run: sudo make build
       - name: QEMU boot smoke test
-        run: make qemu-smoke
+        run: |
+          if ! make qemu-smoke; then
+            cat /tmp/moonlightos-qemu-smoke.log || true
+            exit 1
+          fi
         env:
           MOONLIGHTOS_QEMU_LOG: /tmp/moonlightos-qemu-smoke.log
       - name: Upload failed boot diagnostics
@@ -42,8 +46,6 @@ jobs:
         with:
           name: moonlightos-failed-boot-${{ github.run_id }}
           path: |
-            build/out/moonlightos-0.1.0-alpha-amd64.iso
-            build/out/moonlightos-0.1.0-alpha-amd64.iso.sha256
             /tmp/moonlightos-qemu-smoke.log
           if-no-files-found: warn
           retention-days: 2

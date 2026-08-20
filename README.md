@@ -11,6 +11,7 @@ with an allowlist-only Linux USB/IP server. It is not a general-purpose desktop.
 ## What v0.1 contains
 
 - Debian standard kernel, systemd, NetworkManager, nftables, PipeWire, ALSA
+- IPv4-only wired networking; IPv6 is disabled in v0.1
 - Intel i915, Mesa Vulkan, VA-API, and Intel media-driver packages
 - Cage as the direct DRM/KMS Wayland kiosk compositor; no desktop environment
 - Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned by SHA256
@@ -46,16 +47,30 @@ stages the live-build tree; no application binary is committed to Git.
 
 ## First boot
 
-1. Prefer DisplayPort for 4K testing; connect wired Ethernet and a controller.
-2. Boot the ISO in UEFI mode. It automatically enters the live appliance.
-3. Moonlight opens by default. Exit it to return to the launcher.
-4. Pair Sunshine from Moonlight's UI; no Sunshine IP is hardcoded.
-5. For an installed, durable system, use the ISO boot menu's `Install` entry.
-   Follow [INSTALL.md](docs/INSTALL.md) before selecting a target disk.
+1. Connect DisplayPort/HDMI, wired Ethernet, and a controller or keyboard.
+2. Press `F12` on the Dell, select the UEFI USB device, and wait three seconds.
+3. The launcher appears even without network; Moonlight then opens by default.
+4. Pair Sunshine once in Moonlight. There is no separate MoonlightOS setup wizard.
+
+That is the complete live-image setup. For durable settings, select `Install`
+from the boot menu and follow [INSTALL.md](docs/INSTALL.md). Installation keeps
+the disk-selection confirmation because silently erasing a disk is unsafe.
 
 The installed system preserves application configuration normally. A live USB
 needs a separate persistence partition; installation is the supported durable
-mode for v0.1.
+mode for v0.1. Local LAN streaming and the launcher do not depend on Tailscale.
+
+## Target hardware
+
+The first target is Dell OptiPlex 7010 Micro, service tag DCC36X3: Core
+i5-13500T, UHD 770, 16 GB DDR4-3200, 256 GB NVMe, gigabit Ethernet, and wired
+DisplayPort/HDMI. The image works with the current 1x16 GB DIMM. A matched 2x8
+GB dual-channel kit is preferred because the integrated GPU shares system
+memory bandwidth.
+
+Targets are 1080p60, 1080p120 where supported, 1440p60, and best-effort 4K60
+SDR. 4K HDR is deliberately unclaimed until the exact TV, adapter, cable, and
+display path are tested.
 
 ## Configuration map
 

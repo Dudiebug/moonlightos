@@ -17,3 +17,17 @@ Vulkan, VA-API, audio, network, USB/IP, Tailscale, USB, and display-mode data.
 Do not open UDP/41641 unconditionally. Run `tailscale netcheck` and
 `tailscale ping` first. Do not port-forward Sunshine or USB/IP to the public
 internet.
+
+## USB does not boot
+
+1. Verify the ISO SHA256, then write it to the whole USB device with the `dd`
+   command in `INSTALL.md`.
+2. Use Dell `F12` and choose the `UEFI` USB entry. The image requires x86_64
+   UEFI and has Secure Boot support enabled.
+3. Wait for the three-second GRUB timeout. The launcher is not allowed to wait
+   for DHCP, so unplugged Ethernet must not prevent it from appearing.
+4. If it still stops, capture the exact last message or a photo. Serial boot
+   output is available at 115200 8N1 for development builds.
+
+IPv6 is intentionally unavailable in v0.1. Use `ip -4 address` and `ip -4
+route` when troubleshooting networking.
