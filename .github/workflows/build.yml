@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install --yes live-build curl ca-certificates xorriso \
             squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools dosfstools \
-            qemu-system-x86 ovmf
+            qemu-system-x86 ovmf ripgrep
       - name: Source tests
         run: make test
       - name: Build ISO

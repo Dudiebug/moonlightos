@@ -4,6 +4,11 @@ set -Eeuo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
+command -v rg >/dev/null || {
+  echo 'ripgrep (rg) is required for the static test suite' >&2
+  exit 127
+}
+
 while IFS= read -r file; do
   bash -n "$file"
 done < <(rg -l '^#!/bin/bash' build host scripts tests usbip config/live-build/hooks)

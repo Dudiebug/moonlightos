@@ -25,11 +25,15 @@ lb config noauto \
   --iso-application 'MoonlightOS streaming appliance' \
   --iso-publisher 'MoonlightOS Project' \
   --iso-volume 'MOONLIGHTOS' \
-  --image-name 'moonlightos-0.1.0-alpha' \
   --apt-recommends false \
   --memtest none
 
 lb build
-install -m 0644 moonlightos-0.1.0-alpha-amd64.hybrid.iso "$ISO"
+built_iso=$(find . -maxdepth 1 -type f -name '*.hybrid.iso' -print -quit)
+[[ -n "$built_iso" ]] || {
+  echo 'live-build completed without producing an *.hybrid.iso file' >&2
+  exit 1
+}
+install -m 0644 "$built_iso" "$ISO"
 (cd "$OUT" && sha256sum "$(basename "$ISO")" > "$(basename "$ISO").sha256")
 printf 'ISO: %s\nSHA256: %s.sha256\n' "$ISO" "$ISO"
