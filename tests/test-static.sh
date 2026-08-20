@@ -19,6 +19,7 @@ python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
 python3 - <<'PY'
 import configparser, pathlib, re
 hook = pathlib.Path('config/live-build/hooks/live/0100-moonlightos.hook.chroot').read_text()
+assert hook.index('groupadd --system seat') < hook.index('useradd --uid 1000')
 block = hook.split("cat > /var/lib/moonlightos/config.ini <<'EOF'", 1)[1].split('\nEOF', 1)[0]
 c = configparser.ConfigParser(); c.read_string(block)
 assert c.getboolean('tailscale', 'enabled') is False

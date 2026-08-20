@@ -4,6 +4,9 @@ set -Eeuo pipefail
 if ! getent group moonlightos >/dev/null; then
   groupadd --system moonlightos
 fi
+if ! getent group seat >/dev/null; then
+  groupadd --system seat
+fi
 if ! id moonlightos >/dev/null 2>&1; then
   useradd --uid 1000 --gid moonlightos --groups audio,input,render,video,seat \
     --home-dir /var/lib/moonlightos/home --create-home --shell /bin/bash moonlightos
