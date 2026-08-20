@@ -32,6 +32,7 @@ rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.c
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
 rg -q 'MOONLIGHTOS_LAUNCHER_READY' launcher/moonlightos-launcher.py tests/qemu-smoke.sh
 rg -q 'StandardOutput=journal\+console' services/moonlightos-launcher.service
+! rg -q '^Environment=WAYLAND_DISPLAY=' services/moonlightos-launcher.service
 rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
 rg -q 'unit=1,file=' tests/qemu-smoke.sh
 rg -q 'screendump' tests/qemu-smoke.sh

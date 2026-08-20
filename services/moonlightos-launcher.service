@@ -17,7 +17,6 @@ Environment=XDG_CONFIG_HOME=/var/lib/moonlightos/home/.config
 Environment=XDG_DATA_HOME=/var/lib/moonlightos/home/.local/share
 Environment=XDG_CACHE_HOME=/var/lib/moonlightos/home/.cache
 Environment=XDG_RUNTIME_DIR=/run/moonlightos
-Environment=WAYLAND_DISPLAY=wayland-0
 Environment=LIBSEAT_BACKEND=seatd
 Environment=QT_QPA_PLATFORM=wayland
 RuntimeDirectory=moonlightos
