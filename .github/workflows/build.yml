@@ -19,9 +19,9 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes curl ca-certificates cpio debootstrap xorriso \
-            squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools dosfstools \
-            qemu-system-x86 ovmf ripgrep
+          sudo apt-get install --yes curl ca-certificates cpio debootstrap \
+            debian-archive-keyring xorriso squashfs-tools grub-pc-bin \
+            grub-efi-amd64-bin mtools dosfstools qemu-system-x86 ovmf ripgrep
           curl --fail --location --output /tmp/live-build.deb \
             https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
           echo '58e09779881cbcc631c49ceb703413e0247a87db01823e597b2a1c40a2afd8f4  /tmp/live-build.deb' \
