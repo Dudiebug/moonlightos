@@ -32,6 +32,10 @@ On failure, CI retains the serial log and a QEMU framebuffer screenshot. The
 test also extracts `/boot/grub/grub.cfg` from the ISO and verifies the appliance
 timeout and serial settings before starting the VM.
 
+Success requires `MOONLIGHTOS_LAUNCHER_READY`, emitted only after GTK presents
+the full-screen launcher window. Launcher output is mirrored to the boot console
+for CI while remaining available in `/var/log/moonlightos/launcher.log`.
+
 ## Installed-system QEMU procedure
 
 Create a disposable 24 GB disk, boot the ISO with a graphical QEMU display,

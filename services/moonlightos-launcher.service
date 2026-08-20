@@ -24,14 +24,13 @@ RuntimeDirectory=moonlightos
 RuntimeDirectoryMode=0750
 StateDirectory=moonlightos
 LogsDirectory=moonlightos
-ExecStart=/usr/bin/cage -s -- /usr/libexec/moonlightos-launcher
-ExecStartPre=/bin/sh -c 'printf "MOONLIGHTOS_LAUNCHER_STARTING\\n" > /dev/ttyS0 2>/dev/null || true'
+ExecStart=/bin/bash -o pipefail -c '/usr/bin/cage -s -- /usr/libexec/moonlightos-launcher 2>&1 | /usr/bin/tee -a /var/log/moonlightos/launcher.log'
 Restart=always
 RestartSec=2
 TTYPath=/dev/tty1
 StandardInput=tty
-StandardOutput=append:/var/log/moonlightos/launcher.log
-StandardError=append:/var/log/moonlightos/launcher.log
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target

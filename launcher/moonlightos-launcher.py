@@ -78,6 +78,7 @@ class Launcher(Gtk.Application):
             first = first or button
         window.set_child(box)
         window.present()
+        print("MOONLIGHTOS_LAUNCHER_READY", flush=True)
         first.grab_focus()
         GLib.timeout_add_seconds(5, self._refresh_network)
         GLib.idle_add(self._autostart)

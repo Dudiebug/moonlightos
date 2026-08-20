@@ -89,7 +89,7 @@ fi
 qemu-system-x86_64 "${args[@]}" > "$log" 2>&1 &
 pid=$!
 for _ in $(seq 1 180); do
-  if grep -q 'MOONLIGHTOS_LAUNCHER_STARTING' "$log"; then
+  if grep -q 'MOONLIGHTOS_LAUNCHER_READY' "$log"; then
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     echo 'QEMU smoke test passed: launcher start marker observed.'
