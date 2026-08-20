@@ -21,6 +21,7 @@ lb config noauto \
   --archive-areas 'main contrib non-free-firmware' \
   --debian-installer live \
   --debian-installer-gui false \
+  --debootstrap-options '--include=ca-certificates' \
   --bootappend-live 'boot=live components persistence hostname=moonlightos username=moonlightos locales=en_US.UTF-8 keyboard-layouts=us console=tty1 console=ttyS0,115200n8' \
   --iso-application 'MoonlightOS streaming appliance' \
   --iso-publisher 'MoonlightOS Project' \
