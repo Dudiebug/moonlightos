@@ -17,7 +17,7 @@ boot_test=$(mktemp -d)
 mkdir -p "$boot_test/binary/boot/grub" "$boot_test/binary/isolinux"
 printf 'menuentry live {}\n' > "$boot_test/binary/boot/grub/grub.cfg"
 printf 'include menu.cfg\nprompt 0\ntimeout 0\n' > "$boot_test/binary/isolinux/isolinux.cfg"
-(cd "$boot_test" && bash "$ROOT/config/live-build/hooks/binary/0100-autoboot.hook.binary")
+(cd "$boot_test" && bash "$ROOT/config/live-build/hooks/live/0100-autoboot.hook.binary")
 rg -q '^set default=0$' "$boot_test/binary/boot/grub/grub.cfg"
 rg -q '^set timeout=3$' "$boot_test/binary/boot/grub/grub.cfg"
 rg -q '^terminal_output console serial$' "$boot_test/binary/boot/grub/grub.cfg"
