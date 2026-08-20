@@ -57,18 +57,6 @@ The installed system preserves application configuration normally. A live USB
 needs a separate persistence partition; installation is the supported durable
 mode for v0.1.
 
-## Target hardware
-
-The first target is Dell OptiPlex 7010 Micro, service tag DCC36X3: Core
-i5-13500T, UHD 770, 16 GB DDR4-3200, 256 GB NVMe, gigabit Ethernet, and wired
-DisplayPort/HDMI. The image works with the current 1x16 GB DIMM. A matched 2x8
-GB dual-channel kit is preferred because the integrated GPU shares system
-memory bandwidth.
-
-Targets are 1080p60, 1080p120 where supported, 1440p60, and best-effort 4K60
-SDR. 4K HDR is deliberately unclaimed until the exact TV, adapter, cable, and
-display path are tested.
-
 ## Configuration map
 
 | Purpose | Persistent path |
