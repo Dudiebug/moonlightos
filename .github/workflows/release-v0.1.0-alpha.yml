@@ -1,0 +1,44 @@
+name: release-v0.1.0-alpha
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-v0.1.0-alpha.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out release notes
+        uses: actions/checkout@v5
+
+      - name: Download the boot-tested ISO artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: moonlightos-0.1.0-alpha-amd64
+          path: dist
+          repository: Dudiebug/moonlightos
+          run-id: 32428278836
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify SHA256 checksum
+        working-directory: dist
+        run: sha256sum --check --strict moonlightos-0.1.0-alpha-amd64.iso.sha256
+
+      - name: Create prerelease and upload ISO
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v0.1.0-alpha \
+            --repo "$GITHUB_REPOSITORY" \
+            --target af46f3404b3b055dac25f6f985e06e47c30cfe52 \
+            --title "MoonlightOS v0.1.0-alpha" \
+            --notes-file docs/releases/v0.1.0-alpha.md \
+            --prerelease \
+            dist/moonlightos-0.1.0-alpha-amd64.iso \
+            dist/moonlightos-0.1.0-alpha-amd64.iso.sha256
