@@ -7,9 +7,9 @@ set -Eeuo pipefail
 while IFS= read -r -d '' cfg; do
   sed -i '/^set default=/d; /^set timeout=/d; /^serial --unit=0 /d; /^terminal_input console serial$/d; /^terminal_output console serial$/d' "$cfg"
   sed -i '1i set default=0\nset timeout=3\nserial --unit=0 --speed=115200 --word=8 --parity=no --stop=1\nterminal_input console serial\nterminal_output console serial' "$cfg"
-done < <(find binary -type f -name grub.cfg -print0)
+done < <(find . -type f -name grub.cfg -print0)
 
 while IFS= read -r -d '' cfg; do
   sed -i '/^timeout /d' "$cfg"
   printf '\ntimeout 30\n' >> "$cfg"
-done < <(find binary -type f -name isolinux.cfg -print0)
+done < <(find . -type f -name isolinux.cfg -print0)
