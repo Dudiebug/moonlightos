@@ -61,3 +61,4 @@ jobs:
               --prerelease \
               dist/moonlightos-0.1.0-alpha-amd64.iso \
               dist/moonlightos-0.1.0-alpha-amd64.iso.sha256
+          fi
