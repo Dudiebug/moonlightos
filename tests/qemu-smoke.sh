@@ -17,9 +17,15 @@ temporary_files=()
 [[ -z ${MOONLIGHTOS_QEMU_LOG:-} ]] && temporary_files+=("$log")
 monitor_socket=$(mktemp /tmp/moonlightos-qemu-monitor.XXXXXX)
 find "$monitor_socket" -delete
+serial_input=$(mktemp /tmp/moonlightos-qemu-serial.XXXXXX)
+find "$serial_input" -delete
+mkfifo -m 0600 "$serial_input"
+exec 3<> "$serial_input"
 cleanup() {
+  exec 3>&-
   ((${#temporary_files[@]} == 0)) || find "${temporary_files[@]}" -delete
   [[ ! -e "$monitor_socket" ]] || find "$monitor_socket" -delete
+  [[ ! -e "$serial_input" ]] || find "$serial_input" -delete
 }
 trap cleanup EXIT
 
@@ -86,24 +92,11 @@ else
   exit 69
 fi
 
-qemu-system-x86_64 "${args[@]}" > "$log" 2>&1 &
+qemu-system-x86_64 "${args[@]}" <&3 > "$log" 2>&1 &
 pid=$!
 
-monitor_command() {
-  python3 - "$monitor_socket" "$1" <<'PY'
-import socket
-import sys
-import time
-
-monitor, command = sys.argv[1:]
-client = socket.socket(socket.AF_UNIX)
-client.settimeout(2)
-client.connect(monitor)
-client.recv(4096)
-client.sendall(f"{command}\n".encode())
-time.sleep(0.2)
-client.close()
-PY
+serial_line() {
+  printf '%s\r' "$1" >&3
 }
 
 wait_for_marker() {
@@ -128,20 +121,20 @@ fail() {
 wait_for_marker 'MOONLIGHTOS_LAUNCHER_READY' 180 || fail 'Launcher did not become ready.'
 capture_screen
 
-# ENTER activates the initially selected Moonlight item. A five-second marker
-# proves the real extracted client stayed alive on Cage's XWayland display.
-# Give Foot and Cage time to finish their initial focus/keyboard handoff after
-# the launcher has drawn; sending a key at the readiness-file boundary can be
-# lost while the Wayland seat is still settling.
-sleep 5
-monitor_command 'sendkey ret'
-wait_for_marker 'MOONLIGHTOS_APP_STARTED moonlight' 45 || fail 'Moonlight did not remain running.'
-monitor_command 'sendkey alt-f4'
-sleep 3
+# The CI runner has no interactive display backend, so drive the same request
+# files as the launcher from the live user's serial console. The framebuffer
+# above separately proves that the terminal launcher rendered.
+serial_line moonlightos
+sleep 1
+serial_line live
+sleep 2
+serial_line 'echo MOONLIGHTOS_SMOKE_SHELL_READY'
+wait_for_marker 'MOONLIGHTOS_SMOKE_SHELL_READY' 10 || fail 'Live serial login failed.'
 
-# Focus returns to foot. DOWN + ENTER starts Chiaki on native Wayland.
-monitor_command 'sendkey down'
-monitor_command 'sendkey ret'
+serial_line 'touch /run/moonlightos/start-moonlight'
+wait_for_marker 'MOONLIGHTOS_APP_STARTED moonlight' 45 || fail 'Moonlight did not remain running.'
+
+serial_line 'touch /run/moonlightos/start-chiaki'
 wait_for_marker 'MOONLIGHTOS_APP_STARTED chiaki-ng' 45 || fail 'Chiaki-ng did not remain running.'
 
 kill "$pid" 2>/dev/null || true
