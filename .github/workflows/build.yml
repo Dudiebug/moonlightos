@@ -43,7 +43,7 @@ jobs:
           MOONLIGHTOS_QEMU_SCREENSHOT: /tmp/moonlightos-qemu-smoke.ppm
       - name: Upload failed boot diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: moonlightos-failed-boot-${{ github.run_id }}
           path: |
@@ -52,7 +52,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 2
       - name: Upload ISO and checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: moonlightos-1.1-amd64
           path: |
