@@ -130,6 +130,10 @@ capture_screen
 
 # ENTER activates the initially selected Moonlight item. A five-second marker
 # proves the real extracted client stayed alive on Cage's XWayland display.
+# Give Foot and Cage time to finish their initial focus/keyboard handoff after
+# the launcher has drawn; sending a key at the readiness-file boundary can be
+# lost while the Wayland seat is still settling.
+sleep 5
 monitor_command 'sendkey ret'
 wait_for_marker 'MOONLIGHTOS_APP_STARTED moonlight' 45 || fail 'Moonlight did not remain running.'
 monitor_command 'sendkey alt-f4'
