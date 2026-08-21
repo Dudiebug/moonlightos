@@ -75,7 +75,7 @@ python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address
 
 python3 - <<'PY'
-import configparser, pathlib, re
+import configparser, pathlib, re, subprocess
 hook = pathlib.Path('config/live-build/hooks/live/0100-moonlightos.hook.chroot').read_text()
 assert hook.index('groupadd --system seat') < hook.index('useradd --uid 1000')
 block = hook.split("cat > /var/lib/moonlightos/config.ini <<'EOF'", 1)[1].split('\nEOF', 1)[0]
@@ -92,6 +92,30 @@ for lock in ('build/applications.lock', 'build/sources.lock'):
         fields = line.split('|')
         assert len(fields) == 5, (lock, line)
         assert re.fullmatch(r'[0-9a-f]{64}', fields[3]), (lock, line)
+
+for workflow in pathlib.Path('.github/workflows').glob('*.yml'):
+    lines = workflow.read_text().splitlines()
+    i = 0
+    while i < len(lines):
+        match = re.match(r'^(\s*)run:\s*\|\s*$', lines[i])
+        if not match:
+            i += 1
+            continue
+        start = i
+        parent_indent = len(match.group(1))
+        i += 1
+        block = []
+        while i < len(lines):
+            indent = len(lines[i]) - len(lines[i].lstrip())
+            if lines[i].strip() and indent <= parent_indent:
+                break
+            block.append(lines[i])
+            i += 1
+        nonblank = [line for line in block if line.strip()]
+        block_indent = min(len(line) - len(line.lstrip()) for line in nonblank)
+        script = '\n'.join(line[block_indent:] if line.strip() else '' for line in block)
+        result = subprocess.run(['bash', '-n'], input=script, text=True, capture_output=True)
+        assert result.returncode == 0, (workflow, start + 1, result.stderr)
 PY
 
 if rg -n --hidden -g '!tests/test-static.sh' \
