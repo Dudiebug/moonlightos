@@ -17,15 +17,9 @@ temporary_files=()
 [[ -z ${MOONLIGHTOS_QEMU_LOG:-} ]] && temporary_files+=("$log")
 monitor_socket=$(mktemp /tmp/moonlightos-qemu-monitor.XXXXXX)
 find "$monitor_socket" -delete
-serial_input=$(mktemp /tmp/moonlightos-qemu-serial.XXXXXX)
-find "$serial_input" -delete
-mkfifo -m 0600 "$serial_input"
-exec 3<> "$serial_input"
 cleanup() {
-  exec 3>&-
   ((${#temporary_files[@]} == 0)) || find "${temporary_files[@]}" -delete
   [[ ! -e "$monitor_socket" ]] || find "$monitor_socket" -delete
-  [[ ! -e "$serial_input" ]] || find "$serial_input" -delete
 }
 trap cleanup EXIT
 
@@ -59,6 +53,7 @@ args=(
   -device virtio-vga -display none -serial stdio -no-reboot
   -monitor "unix:$monitor_socket,server=on,wait=off"
   -netdev "user,id=net0" -device "e1000,netdev=net0"
+  -fw_cfg "name=opt/moonlightos.smoke,string=apps"
 )
 [[ -r /dev/kvm ]] && args=(-enable-kvm -cpu host "${args[@]}")
 
@@ -92,12 +87,8 @@ else
   exit 69
 fi
 
-qemu-system-x86_64 "${args[@]}" <&3 > "$log" 2>&1 &
+qemu-system-x86_64 "${args[@]}" > "$log" 2>&1 &
 pid=$!
-
-serial_line() {
-  printf '%s\r' "$1" >&3
-}
 
 wait_for_marker() {
   local marker=$1 timeout=$2
@@ -121,21 +112,10 @@ fail() {
 wait_for_marker 'MOONLIGHTOS_LAUNCHER_READY' 180 || fail 'Launcher did not become ready.'
 capture_screen
 
-# The CI runner has no interactive display backend, so drive the same request
-# files as the launcher from the live user's serial console. The framebuffer
-# above separately proves that the terminal launcher rendered.
-serial_line moonlightos
-sleep 1
-serial_line live
-sleep 2
-serial_line 'echo MOONLIGHTOS_SMOKE_SHELL_READY'
-wait_for_marker 'MOONLIGHTOS_SMOKE_SHELL_READY' 10 || fail 'Live serial login failed.'
-
-serial_line 'touch /run/moonlightos/start-moonlight'
-wait_for_marker 'MOONLIGHTOS_APP_STARTED moonlight' 45 || fail 'Moonlight did not remain running.'
-
-serial_line 'touch /run/moonlightos/start-chiaki'
-wait_for_marker 'MOONLIGHTOS_APP_STARTED chiaki-ng' 45 || fail 'Chiaki-ng did not remain running.'
+# A QEMU fw_cfg flag activates the otherwise inert smoke driver inside the
+# guest. It uses the same request files as the launcher and reports success
+# only after both real client processes have remained alive for five seconds.
+wait_for_marker 'MOONLIGHTOS_SMOKE_APPS_READY' 90 || fail 'Streaming clients did not remain running.'
 
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true

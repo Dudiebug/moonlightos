@@ -32,7 +32,9 @@ export APPDIR="$appdir"
 export PATH="$appdir/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 touch /run/moonlightos/app-active
-cleanup() { rm -f -- /run/moonlightos/app-active; }
+ready=/run/moonlightos/$APP-ready
+rm -f -- "$ready"
+cleanup() { rm -f -- /run/moonlightos/app-active "$ready"; }
 trap cleanup EXIT INT TERM
 
 run_client() {
@@ -45,6 +47,7 @@ run_client() {
     fi
     sleep 0.1
   done
+  touch "$ready"
   echo "MOONLIGHTOS_APP_STARTED $APP"
   wait "$pid"
 }
@@ -52,8 +55,8 @@ run_client() {
 printf '%s starting %s\n' "$(date --iso-8601=seconds)" "$APP"
 set +e
 if [[ "$APP" == moonlight ]]; then
-  # Moonlight Qt has no production-grade standalone DRM backend. Native
-  # Wayland under Cage avoids XWayland and retains VA-API access.
+  # The pinned Moonlight Qt payload includes XCB but no Wayland platform
+  # plugin, so it runs through Cage's XWayland support.
   host=$(moonlightos-host-address --quiet 2>/dev/null || true)
   profile_app=$(python3 - "$DATA_DIR/config.ini" <<'PY'
 import configparser, sys

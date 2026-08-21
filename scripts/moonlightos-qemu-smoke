@@ -1,0 +1,23 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+flag=/sys/firmware/qemu_fw_cfg/by_name/opt/moonlightos.smoke/raw
+[[ -r "$flag" ]] || exit 0
+[[ $(tr -d '\0' < "$flag") == apps ]] || exit 0
+
+wait_for_file() {
+  local path=$1 label=$2
+  for _ in $(seq 1 450); do
+    [[ -e "$path" ]] && return 0
+    sleep 0.1
+  done
+  echo "QEMU smoke test timed out waiting for $label" >&2
+  exit 1
+}
+
+wait_for_file /run/moonlightos/launcher-ready launcher
+touch /run/moonlightos/start-moonlight
+wait_for_file /run/moonlightos/moonlight-ready Moonlight
+touch /run/moonlightos/start-chiaki
+wait_for_file /run/moonlightos/chiaki-ng-ready chiaki-ng
+echo MOONLIGHTOS_SMOKE_APPS_READY

@@ -49,8 +49,12 @@ rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
 rg -q 'unit=1,file=' tests/qemu-smoke.sh
 rg -q 'screendump' tests/qemu-smoke.sh
 rg -q '/boot/grub/grub.cfg' tests/qemu-smoke.sh
-rg -q 'MOONLIGHTOS_APP_STARTED moonlight' tests/qemu-smoke.sh
-rg -q 'MOONLIGHTOS_APP_STARTED chiaki-ng' tests/qemu-smoke.sh
+rg -q 'MOONLIGHTOS_APP_STARTED' scripts/moonlightos-run-app
+rg -q 'moonlight-ready' scripts/moonlightos-qemu-smoke
+rg -q 'chiaki-ng-ready' scripts/moonlightos-qemu-smoke
+rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
+rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-smoke.service
+rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address

@@ -24,6 +24,7 @@ install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
 install -D -m 0755 "$ROOT/launcher/moonlightos-launcher.py" "$CHROOT/usr/libexec/moonlightos-launcher"
 install -D -m 0755 "$ROOT/launcher/gamepad-nav.py" "$CHROOT/usr/libexec/moonlightos-gamepad-nav"
 install -D -m 0755 "$ROOT/scripts/moonlightos-run-app" "$CHROOT/usr/libexec/moonlightos-run-app"
+install -D -m 0755 "$ROOT/scripts/moonlightos-qemu-smoke" "$CHROOT/usr/libexec/moonlightos-qemu-smoke"
 install -D -m 0755 "$ROOT/scripts/moonlightos-diagnostics" "$CHROOT/usr/bin/moonlightos-diagnostics"
 install -D -m 0755 "$ROOT/scripts/moonlightos-network-ready" "$CHROOT/usr/libexec/moonlightos-network-ready"
 install -D -m 0755 "$ROOT/scripts/moonlightos-firewall" "$CHROOT/usr/libexec/moonlightos-firewall"
