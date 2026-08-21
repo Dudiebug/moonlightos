@@ -8,8 +8,8 @@ and source records remain installed under `/usr/share/doc/*/copyright`.
 |---|---|---|
 | Debian 13 and packages | https://www.debian.org/ | Per-package licenses; corresponding source is available from Debian repositories configured for the image |
 | Linux kernel | https://kernel.org/ | GPL-2.0-only |
-| Moonlight Qt | https://github.com/moonlight-stream/moonlight-qt | GPL-3.0-only; v6.1.0 unmodified AppImage |
-| chiaki-ng | https://github.com/streetpea/chiaki-ng | AGPL-3.0-only; v1.10.0 unmodified AppImage |
+| Moonlight Qt | https://github.com/moonlight-stream/moonlight-qt | GPL-3.0-only; v6.1.0 unmodified payload extracted from pinned AppImage |
+| chiaki-ng | https://github.com/streetpea/chiaki-ng | AGPL-3.0-only; v1.10.0 unmodified payload extracted from pinned AppImage |
 | Mesa | https://mesa3d.org/ | Primarily MIT and other permissive licenses; Debian copyright file is authoritative |
 | Gamescope | https://github.com/ValveSoftware/gamescope | BSD-2-Clause |
 | Cage | https://www.hjdskes.nl/projects/cage/ | MIT |

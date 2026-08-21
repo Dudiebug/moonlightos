@@ -1,6 +1,6 @@
 [Unit]
 Description=MoonlightOS chiaki-ng client
-After=moonlightos-launcher.service moonlightos-network-ready.service
+After=moonlightos-launcher.service
 ConditionFileIsExecutable=/opt/moonlightos/apps/chiaki-ng.AppImage
 StartLimitIntervalSec=60
 StartLimitBurst=3
@@ -18,8 +18,9 @@ Environment=XDG_RUNTIME_DIR=/run/moonlightos
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=QT_QPA_PLATFORM=wayland
 Environment=SDL_AUDIODRIVER=pipewire
+EnvironmentFile=-/run/moonlightos/session.env
 ExecStart=/usr/libexec/moonlightos-run-app chiaki-ng
 Restart=on-failure
 RestartSec=2
-StandardOutput=append:/var/log/moonlightos/chiaki-ng.log
-StandardError=append:/var/log/moonlightos/chiaki-ng.log
+StandardOutput=journal+console
+StandardError=journal+console

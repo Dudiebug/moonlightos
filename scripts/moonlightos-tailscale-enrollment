@@ -7,9 +7,18 @@ echo
 echo 'Waiting for a local authentication URL...'
 for _ in $(seq 1 120); do
   if [[ -s "$url_file" ]]; then
+    url=$(head -n 1 "$url_file")
     echo
-    echo 'Open this URL on a trusted device:'
-    cat "$url_file"
+    echo 'Scan this QR code with a trusted phone:'
+    echo
+    if command -v qrencode >/dev/null; then
+      qrencode -t ANSIUTF8 -m 2 "$url"
+    else
+      echo '(QR renderer unavailable)'
+    fi
+    echo
+    echo 'Or open this address:'
+    printf '%s\n' "$url"
     echo
     echo 'This URL is short-lived and is not written to persistent logs.'
     echo 'The window may be closed after authentication completes.'
@@ -20,6 +29,14 @@ for _ in $(seq 1 120); do
     echo 'Enrollment failed. Run moonlightos-tailscale-diagnostics.'
     read -r _
     exit 1
+  fi
+  if ! systemctl is-active --quiet moonlightos-tailscale-enroll.service &&
+      tailscale status --json 2>/dev/null | jq -e '.BackendState == "Running"' >/dev/null; then
+    echo
+    echo 'Tailscale is already connected.'
+    echo 'Press ENTER to return to MoonlightOS.'
+    read -r _
+    exit 0
   fi
   sleep 1
 done

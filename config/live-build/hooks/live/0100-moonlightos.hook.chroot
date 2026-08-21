@@ -17,7 +17,7 @@ install -d -o moonlightos -g moonlightos -m 0750 \
 
 cat > /var/lib/moonlightos/config.ini <<'EOF'
 [launcher]
-autostart = moonlight
+autostart = none
 
 [moonlight]
 resolution = 1920x1080

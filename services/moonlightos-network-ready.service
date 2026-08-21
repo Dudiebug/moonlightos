@@ -2,7 +2,7 @@
 Description=MoonlightOS wired network readiness
 Wants=NetworkManager-wait-online.service
 After=NetworkManager-wait-online.service
-Before=moonlightos-launcher.service moonlightos-usbipd.service
+Before=moonlightos-usbipd.service
 
 [Service]
 Type=oneshot

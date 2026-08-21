@@ -1,10 +1,11 @@
 # Known limitations
 
 - No physical DCC36X3 test has been recorded in this repository yet.
-- Moonlight uses native Wayland under Cage, not a claimed direct-KMS Moonlight
-  client. Cage itself owns DRM/KMS directly.
-- AppImages are pinned upstream binaries; native source-built Debian packages
-  are a v0.2 goal.
+- Moonlight uses XWayland under Cage because the pinned Moonlight Qt build does
+  not include a Wayland Qt platform plugin. Cage itself owns DRM/KMS directly.
+- Moonlight and chiaki-ng come from hash-pinned upstream AppImages, but their
+  payloads are extracted into the image at build time. Native source-built
+  Debian packages remain a future goal.
 - 4K60 SDR is best effort. HDR is unverified and unsupported for acceptance.
 - The installed root filesystem is writable; A/B read-only updates are v0.2.
 - Wi-Fi and Bluetooth configuration are outside v0.1.

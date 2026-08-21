@@ -30,13 +30,27 @@ rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
-rg -q 'MOONLIGHTOS_LAUNCHER_READY' launcher/moonlightos-launcher.py tests/qemu-smoke.sh
+! rg -q 'Before=.*moonlightos-launcher.service' services/moonlightos-network-ready.service
+! rg -q 'moonlightos-network-ready.service' services/moonlightos-{moonlight,chiaki}.service
+rg -q 'MOONLIGHTOS_LAUNCHER_READY' services/moonlightos-launcher.service tests/qemu-smoke.sh
 rg -q 'StandardOutput=journal\+console' services/moonlightos-launcher.service
 ! rg -q '^Environment=WAYLAND_DISPLAY=' services/moonlightos-launcher.service
+rg -q '/usr/bin/cage -s -- /usr/bin/foot --fullscreen' services/moonlightos-launcher.service
+rg -q '^Environment=QT_QPA_PLATFORM=xcb$' services/moonlightos-moonlight.service
+rg -q '^Environment=QT_QPA_PLATFORM=wayland$' services/moonlightos-chiaki.service
+rg -q '^EnvironmentFile=-/run/moonlightos/session.env$' services/moonlightos-{moonlight,chiaki}.service
+rg -q 'binary=\$appdir/usr/bin/moonlight' scripts/moonlightos-run-app
+rg -q 'binary=\$appdir/usr/bin/chiaki' scripts/moonlightos-run-app
+rg -q 'unsquashfs -quiet -offset' build/configure.sh
+rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q 'qrencode -t ANSIUTF8' scripts/moonlightos-tailscale-enrollment
+! rg -q 'python3-gi|gir1.2-gtk|libfuse' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
 rg -q 'unit=1,file=' tests/qemu-smoke.sh
 rg -q 'screendump' tests/qemu-smoke.sh
 rg -q '/boot/grub/grub.cfg' tests/qemu-smoke.sh
+rg -q 'MOONLIGHTOS_APP_STARTED moonlight' tests/qemu-smoke.sh
+rg -q 'MOONLIGHTOS_APP_STARTED chiaki-ng' tests/qemu-smoke.sh
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address

@@ -49,7 +49,7 @@ PY
 }
 
 args=(
-  -m 2048 -smp 2 -boot d -cdrom "$ISO"
+  -m 3072 -smp 2 -boot d -cdrom "$ISO"
   -device virtio-vga -display none -serial stdio -no-reboot
   -monitor "unix:$monitor_socket,server=on,wait=off"
   -netdev "user,id=net0" -device "e1000,netdev=net0"
@@ -88,24 +88,58 @@ fi
 
 qemu-system-x86_64 "${args[@]}" > "$log" 2>&1 &
 pid=$!
-for _ in $(seq 1 180); do
-  if grep -q 'MOONLIGHTOS_LAUNCHER_READY' "$log"; then
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-    echo 'QEMU smoke test passed: launcher start marker observed.'
-    exit 0
-  fi
-  if ! kill -0 "$pid" 2>/dev/null; then
-    capture_screen
-    cat "$log"
-    echo 'QEMU exited before the launcher marker.' >&2
-    exit 1
-  fi
-  sleep 1
-done
+
+monitor_command() {
+  python3 - "$monitor_socket" "$1" <<'PY'
+import socket
+import sys
+import time
+
+monitor, command = sys.argv[1:]
+client = socket.socket(socket.AF_UNIX)
+client.settimeout(2)
+client.connect(monitor)
+client.recv(4096)
+client.sendall(f"{command}\n".encode())
+time.sleep(0.2)
+client.close()
+PY
+}
+
+wait_for_marker() {
+  local marker=$1 timeout=$2
+  for _ in $(seq 1 "$timeout"); do
+    grep -q "$marker" "$log" && return 0
+    kill -0 "$pid" 2>/dev/null || return 1
+    sleep 1
+  done
+  return 1
+}
+
+fail() {
+  capture_screen
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  cat "$log"
+  echo "$1" >&2
+  exit 1
+}
+
+wait_for_marker 'MOONLIGHTOS_LAUNCHER_READY' 180 || fail 'Launcher did not become ready.'
 capture_screen
+
+# ENTER activates the initially selected Moonlight item. A five-second marker
+# proves the real extracted client stayed alive on Cage's XWayland display.
+monitor_command 'sendkey ret'
+wait_for_marker 'MOONLIGHTOS_APP_STARTED moonlight' 45 || fail 'Moonlight did not remain running.'
+monitor_command 'sendkey alt-f4'
+sleep 3
+
+# Focus returns to foot. DOWN + ENTER starts Chiaki on native Wayland.
+monitor_command 'sendkey down'
+monitor_command 'sendkey ret'
+wait_for_marker 'MOONLIGHTOS_APP_STARTED chiaki-ng' 45 || fail 'Chiaki-ng did not remain running.'
+
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
-cat "$log"
-echo 'Timed out waiting for launcher marker.' >&2
-exit 1
+echo 'QEMU smoke test passed: terminal launcher, Moonlight, and Chiaki-ng started.'

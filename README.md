@@ -15,7 +15,7 @@ with an allowlist-only Linux USB/IP server. It is not a general-purpose desktop.
 - Intel i915, Mesa Vulkan, VA-API, and Intel media-driver packages
 - Cage as the direct DRM/KMS Wayland kiosk compositor; no desktop environment
 - Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned by SHA256
-- GTK 4 launcher with keyboard and common gamepad navigation
+- black-and-white full-screen terminal launcher with keyboard and common gamepad navigation
 - systemd crash recovery for the launcher and both streaming applications
 - explicit USB/IP allowlist, hotplug reconciliation, and fail-closed TCP/3240
 - optional, unauthenticated-by-default Tailscale overlay and native Tailscale SSH
@@ -43,14 +43,15 @@ build/out/moonlightos-0.1.0-alpha-amd64.iso.sha256
 
 `scripts/fetch-apps.sh` downloads only the versions in
 `build/applications.lock` and rejects a hash mismatch. `build/configure.sh`
-stages the live-build tree; no application binary is committed to Git.
+extracts their pinned payloads into the read-only image so runtime FUSE is not
+required. No application binary is committed to Git.
 
 ## First boot
 
 1. Connect DisplayPort/HDMI, wired Ethernet, and a controller or keyboard.
 2. Press `F12` on the Dell, select the UEFI USB device, and wait three seconds.
-3. The launcher appears even without network; Moonlight then opens by default.
-4. Pair Sunshine once in Moonlight. There is no separate MoonlightOS setup wizard.
+3. The launcher appears even without network; select Moonlight or chiaki-ng.
+4. Pair Sunshine once in Moonlight. Tailscale setup, when wanted, uses an on-screen QR code.
 
 That is the complete live-image setup. For durable settings, select `Install`
 from the boot menu and follow [INSTALL.md](docs/INSTALL.md). Installation keeps

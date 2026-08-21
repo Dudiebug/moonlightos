@@ -33,12 +33,10 @@ xwayland
 foot
 gamescope/trixie-backports
 python3
-python3-gi
 python3-evdev
-gir1.2-gtk-4.0
-libfuse2t64
-fuse3
 libhidapi-hidraw0
+libopengl0
+qrencode
 
 # Audio and input
 pipewire

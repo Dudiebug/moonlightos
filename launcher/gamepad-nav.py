@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import glob
 import pathlib
-import subprocess
 import time
 
 from evdev import InputDevice, UInput, ecodes
@@ -22,10 +21,7 @@ def app_active() -> bool:
     if now - _last_state_check < 0.5:
         return _last_state
     _last_state_check = now
-    _last_state = any(
-        subprocess.run(["systemctl", "is-active", "--quiet", unit], check=False).returncode == 0
-        for unit in ("moonlightos-moonlight.service", "moonlightos-chiaki.service")
-    )
+    _last_state = pathlib.Path("/run/moonlightos/app-active").exists()
     return _last_state
 
 

@@ -1,12 +1,25 @@
 #!/usr/bin/python3
-"""Small GTK appliance launcher; Cage supplies the full-screen Wayland shell."""
+"""Full-screen terminal launcher for the MoonlightOS appliance."""
 
 from __future__ import annotations
 
-import configparser
+import curses
+import os
 import pathlib
 import subprocess
 import time
+
+
+RUN = pathlib.Path("/run/moonlightos")
+MENU = (
+    ("MOONLIGHT", "moonlight"),
+    ("CHIAKI-NG", "chiaki"),
+    ("TAILSCALE", "tailscale"),
+    ("SETTINGS", "settings"),
+    ("REBOOT", "reboot"),
+    ("SHUTDOWN", "poweroff"),
+)
+GAP_BEFORE = {3, 4}
 
 
 def get_ipv4(output: str) -> str:
@@ -15,122 +28,157 @@ def get_ipv4(output: str) -> str:
         if "inet" in fields:
             value = fields[fields.index("inet") + 1]
             return value.split("/", 1)[0]
-    return "No IPv4 address"
+    return "NO IPV4"
 
 
-import gi
+def network_summary() -> str:
+    result = subprocess.run(
+        ["ip", "-brief", "-4", "address", "show", "up"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    address = get_ipv4(result.stdout)
+    state = "ONLINE" if address != "NO IPV4" else "OFFLINE"
+    return f"{address}  {state}"
 
-gi.require_version("Gtk", "4.0")
-from gi.repository import GLib, Gtk  # noqa: E402
 
-DATA = pathlib.Path("/var/lib/moonlightos")
-RUN = pathlib.Path("/run/moonlightos")
-CONFIG = DATA / "config.ini"
+def add_centered(screen: curses.window, row: int, text: str) -> None:
+    height, width = screen.getmaxyx()
+    if not 0 <= row < height or width < 2:
+        return
+    clipped = text[: max(0, width - 4)]
+    column = max(1, (width - len(clipped)) // 2)
+    try:
+        screen.addstr(row, column, clipped)
+    except curses.error:
+        pass
 
 
-class Launcher(Gtk.Application):
-    def __init__(self) -> None:
-        super().__init__(application_id="org.moonlightos.Launcher")
-        self.autostart_done = False
+class Launcher:
+    def __init__(self, screen: curses.window) -> None:
+        self.screen = screen
+        self.selected = 0
+        self.status = network_summary()
+        self.last_status_update = time.monotonic()
 
-    def do_activate(self) -> None:
-        window = Gtk.ApplicationWindow(application=self, title="MoonlightOS")
-        window.fullscreen()
-
-        css = Gtk.CssProvider()
-        css.load_from_data(b"""
-            window { background: #0b1220; color: #eef4ff; }
-            .title { font-size: 34px; font-weight: 700; }
-            .status { font-size: 17px; color: #9db4d4; }
-            button { min-height: 48px; min-width: 390px; margin: 4px; font-size: 19px; }
-            button:focus { outline: 4px solid #78b7ff; }
-        """)
-        Gtk.StyleContext.add_provider_for_display(
-            window.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        box.set_halign(Gtk.Align.CENTER)
-        box.set_valign(Gtk.Align.CENTER)
-        title = Gtk.Label(label="MoonlightOS")
-        title.add_css_class("title")
-        box.append(title)
-
-        self.status = Gtk.Label(label=self._network_status())
-        self.status.add_css_class("status")
-        box.append(self.status)
-
-        actions = [
-            ("Start Moonlight", "moonlight"),
-            ("Start Chiaki-ng", "chiaki"),
-            ("Settings / diagnostics", "diagnostics"),
-            ("Enable Tailscale", "tailscale"),
-            ("Tailscale diagnostics", "tailscale-diagnostics"),
-            ("Enable Tailscale SSH", "tailscale-ssh"),
-            ("Reboot", "reboot"),
-            ("Shutdown", "poweroff"),
-        ]
-        first = None
-        for label, action in actions:
-            button = Gtk.Button(label=label)
-            button.connect("clicked", self._clicked, action)
-            box.append(button)
-            first = first or button
-        window.set_child(box)
-        window.present()
-        print("MOONLIGHTOS_LAUNCHER_READY", flush=True)
-        first.grab_focus()
-        GLib.timeout_add_seconds(5, self._refresh_network)
-        GLib.idle_add(self._autostart)
-
-    def _network_status(self) -> str:
-        result = subprocess.run(
-            ["ip", "-brief", "-4", "address", "show", "up"],
-            text=True, capture_output=True, check=False
-        )
-        selected = subprocess.run(
-            ["moonlightos-host-address"], text=True, capture_output=True, check=False
-        ).stdout.strip()
-        return f"Ethernet: {get_ipv4(result.stdout)}\n{selected or 'Sunshine: no host configured'}"
-
-    def _refresh_network(self) -> bool:
-        self.status.set_label(self._network_status())
-        return True
-
-    def _request(self, name: str) -> None:
+    def prepare_session(self) -> None:
         RUN.mkdir(mode=0o750, parents=True, exist_ok=True)
+        display = os.environ.get("DISPLAY", ":0")
+        wayland = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
+        if not display.startswith(":") or "/" in display or "/" in wayland:
+            raise RuntimeError("Cage supplied an invalid display environment")
+        (RUN / "session.env").write_text(
+            f"DISPLAY={display}\nWAYLAND_DISPLAY={wayland}\n", encoding="utf-8"
+        )
+        os.chmod(RUN / "session.env", 0o640)
+
+    def request(self, name: str) -> None:
         (RUN / name).touch()
 
-    def _clicked(self, _button: Gtk.Button, action: str) -> None:
-        mapping = {
-            "moonlight": "start-moonlight",
-            "chiaki": "start-chiaki",
-            "reboot": "reboot",
-            "poweroff": "poweroff",
-            "tailscale": "tailscale-enroll",
-            "tailscale-ssh": "tailscale-ssh-enable",
-        }
-        if action in mapping:
-            self._request(mapping[action])
-        elif action == "diagnostics":
-            subprocess.Popen(["foot", "--title=MoonlightOS diagnostics", "moonlightos-diagnostics", "--watch"])
-        elif action == "tailscale-diagnostics":
-            subprocess.Popen(["foot", "--hold", "--title=Tailscale diagnostics", "moonlightos-tailscale-diagnostics"])
-        if action == "tailscale":
-            subprocess.Popen(["foot", "--title=Tailscale enrollment", "moonlightos-tailscale-enrollment"])
+    def draw(self) -> None:
+        self.screen.erase()
+        height, width = self.screen.getmaxyx()
+        if height >= 8 and width >= 24:
+            try:
+                self.screen.border(
+                    ord("|"), ord("|"), ord("-"), ord("-"),
+                    ord("+"), ord("+"), ord("+"), ord("+"),
+                )
+            except curses.error:
+                pass
 
-    def _autostart(self) -> bool:
-        if self.autostart_done:
-            return False
-        self.autostart_done = True
-        config = configparser.ConfigParser()
-        config.read(CONFIG)
-        if config.get("launcher", "autostart", fallback="moonlight") == "moonlight":
-            # Give Cage and the path units time to settle.
-            time.sleep(1)
-            self._request("start-moonlight")
-        return False
+        title_row = max(2, height // 8)
+        add_centered(self.screen, title_row, "MOONLIGHTOS")
+
+        rows = []
+        row = max(title_row + 3, height // 3)
+        for index, (label, _action) in enumerate(MENU):
+            if index in GAP_BEFORE:
+                row += 1
+            rows.append((row, label))
+            row += 1
+
+        menu_width = max(len(label) for _row, label in rows) + 3
+        menu_left = max(2, (width - menu_width) // 2)
+        for index, (menu_row, label) in enumerate(rows):
+            if menu_row >= height - 3:
+                break
+            marker = ">" if index == self.selected else " "
+            try:
+                self.screen.addnstr(
+                    menu_row, menu_left, f"{marker}  {label}", max(1, width - menu_left - 1)
+                )
+            except curses.error:
+                pass
+
+        add_centered(self.screen, max(row + 2, height - 4), self.status)
+        self.screen.refresh()
+
+    def terminal_command(self, command: list[str], wait_message: str | None = None) -> int:
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            result = subprocess.run(command, check=False)
+            if wait_message:
+                print()
+                print(wait_message)
+                input()
+            return result.returncode
+        finally:
+            curses.reset_prog_mode()
+            self.screen.clear()
+            self.screen.refresh()
+
+    def activate(self) -> None:
+        _label, action = MENU[self.selected]
+        if action == "moonlight":
+            self.request("start-moonlight")
+        elif action == "chiaki":
+            self.request("start-chiaki")
+        elif action == "tailscale":
+            self.request("tailscale-enroll")
+            self.terminal_command(["moonlightos-tailscale-enrollment"])
+        elif action == "settings":
+            self.terminal_command(
+                ["moonlightos-diagnostics"], "Press ENTER to return to the launcher."
+            )
+        elif action in {"reboot", "poweroff"}:
+            self.request(action)
+
+    def run(self) -> None:
+        self.prepare_session()
+        curses.curs_set(0)
+        self.screen.keypad(True)
+        self.screen.timeout(1000)
+        try:
+            curses.use_default_colors()
+        except curses.error:
+            pass
+
+        self.draw()
+        (RUN / "launcher-ready").touch()
+        while True:
+            key = self.screen.getch()
+            if key in (curses.KEY_UP, ord("k")):
+                self.selected = (self.selected - 1) % len(MENU)
+            elif key in (curses.KEY_DOWN, ord("j")):
+                self.selected = (self.selected + 1) % len(MENU)
+            elif key in (curses.KEY_ENTER, 10, 13):
+                self.activate()
+            elif key == curses.KEY_RESIZE:
+                pass
+
+            now = time.monotonic()
+            if now - self.last_status_update >= 5:
+                self.status = network_summary()
+                self.last_status_update = now
+            self.draw()
+
+
+def main(screen: curses.window) -> None:
+    Launcher(screen).run()
 
 
 if __name__ == "__main__":
-    raise SystemExit(Launcher().run())
+    curses.wrapper(main)

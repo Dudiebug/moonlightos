@@ -26,10 +26,10 @@ Official references: [Linux install](https://tailscale.com/docs/install/linux),
 
 ## Enrollment
 
-Choose **Enable Tailscale** in the local launcher. MoonlightOS starts the native
-daemon, generates `moonlightos-<first-eight-machine-id>` unless `node_name` is
-configured, and displays a short-lived login URL locally. The URL is kept only
-under `/run`; it is not written to persistent logs.
+Choose **TAILSCALE** in the local launcher. MoonlightOS starts the native daemon,
+generates `moonlightos-<first-eight-machine-id>` unless `node_name` is configured,
+and displays the short-lived login URL as a scannable QR code plus text. The URL
+is kept only under `/run`; it is not written to persistent logs.
 
 For out-of-band provisioning, place a single-use key in
 `/etc/moonlightos/tailscale-auth.key`, owned by root with mode `0600`. The

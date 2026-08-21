@@ -5,6 +5,11 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORK="$ROOT/build/work"
 CHROOT="$WORK/config/includes.chroot"
 
+command -v unsquashfs >/dev/null || {
+  echo 'squashfs-tools is required to extract pinned application payloads' >&2
+  exit 127
+}
+
 if [[ -d "$WORK" ]]; then
   find "$WORK" -depth -mindepth 1 -delete
 fi
@@ -39,7 +44,26 @@ done
 install -d -m 0755 "$CHROOT/opt/moonlightos/apps"
 while IFS='|' read -r name _version _url _checksum filename; do
   [[ -z "$name" || "$name" == \#* ]] && continue
-  install -m 0755 "$ROOT/build/downloads/$filename" "$CHROOT/opt/moonlightos/apps/$filename"
+  extract=$(mktemp -d "$ROOT/build/.appimage.XXXXXX")
+  trap 'find "$extract" -depth -delete' EXIT
+  install -m 0755 "$ROOT/build/downloads/$filename" "$extract/application.AppImage"
+  offset=$("$extract/application.AppImage" --appimage-offset)
+  unsquashfs -quiet -offset "$offset" -dest "$extract/squashfs-root" \
+    "$extract/application.AppImage"
+  install -d -m 0755 "$CHROOT/opt/moonlightos/apps/$name"
+  cp -a "$extract/squashfs-root/." "$CHROOT/opt/moonlightos/apps/$name/"
+  case "$name" in
+    moonlight)
+      test -x "$CHROOT/opt/moonlightos/apps/$name/usr/bin/moonlight"
+      test -f "$CHROOT/opt/moonlightos/apps/$name/usr/plugins/platforms/libqxcb.so"
+      ;;
+    chiaki-ng)
+      test -x "$CHROOT/opt/moonlightos/apps/$name/usr/bin/chiaki"
+      test -f "$CHROOT/opt/moonlightos/apps/$name/usr/plugins/platforms/libqwayland-egl.so"
+      ;;
+  esac
+  find "$extract" -depth -delete
+  trap - EXIT
 done < "$ROOT/build/applications.lock"
 
 printf 'Prepared %s\n' "$WORK"
