@@ -33,8 +33,8 @@ test also extracts `/boot/grub/grub.cfg` from the ISO and verifies the appliance
 timeout and serial settings before starting the VM.
 
 Success requires `MOONLIGHTOS_LAUNCHER_READY`, emitted only after foot presents
-the full-screen curses launcher. CI then activates the first two menu items and
-requires both `MOONLIGHTOS_APP_STARTED moonlight` and
+the full-screen curses launcher. A QEMU-only firmware flag then starts the two
+production application services and requires both `MOONLIGHTOS_APP_STARTED moonlight` and
 `MOONLIGHTOS_APP_STARTED chiaki-ng` after each real client remains alive for five
 seconds. Launcher output is mirrored to the boot console and remains available
 in `/var/log/moonlightos/launcher.log`.

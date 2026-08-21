@@ -1,7 +1,7 @@
 [Unit]
 Description=MoonlightOS QEMU-only application smoke driver
-After=moonlightos-launcher.service moonlightos-moonlight.path moonlightos-chiaki.path
-Wants=moonlightos-launcher.service moonlightos-moonlight.path moonlightos-chiaki.path
+After=moonlightos-launcher.service
+Wants=moonlightos-launcher.service
 ConditionPathExists=/sys/firmware/qemu_fw_cfg/by_name/opt/moonlightos.smoke/raw
 
 [Service]

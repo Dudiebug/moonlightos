@@ -16,8 +16,8 @@ wait_for_file() {
 }
 
 wait_for_file /run/moonlightos/launcher-ready launcher
-touch /run/moonlightos/start-moonlight
+systemctl start --no-block moonlightos-moonlight.service
 wait_for_file /run/moonlightos/moonlight-ready Moonlight
-touch /run/moonlightos/start-chiaki
+systemctl start --no-block moonlightos-chiaki.service
 wait_for_file /run/moonlightos/chiaki-ng-ready chiaki-ng
 echo MOONLIGHTOS_SMOKE_APPS_READY
