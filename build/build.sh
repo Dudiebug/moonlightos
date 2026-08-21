@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORK="$ROOT/build/work"
 OUT="$ROOT/build/out"
-ISO="$OUT/moonlightos-1.1-amd64.iso"
+ISO="$OUT/moonlightos-0.1.2-amd64.iso"
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'Run with sudo: sudo make build' >&2; exit 1; }
 command -v lb >/dev/null || { echo 'live-build is required (apt install live-build)' >&2; exit 1; }

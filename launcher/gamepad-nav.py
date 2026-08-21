@@ -46,6 +46,24 @@ def emit(ui: UInput, key: int) -> None:
     ui.syn()
 
 
+def key_for_event(event) -> int | None:
+    if event.type == ecodes.EV_KEY and event.value == 1:
+        return {
+            ecodes.BTN_SOUTH: ecodes.KEY_ENTER,
+            ecodes.BTN_EAST: ecodes.KEY_ESC,
+            ecodes.BTN_DPAD_UP: ecodes.KEY_UP,
+            ecodes.BTN_DPAD_DOWN: ecodes.KEY_DOWN,
+            ecodes.BTN_DPAD_LEFT: ecodes.KEY_LEFT,
+            ecodes.BTN_DPAD_RIGHT: ecodes.KEY_RIGHT,
+        }.get(event.code)
+    if event.type == ecodes.EV_ABS:
+        if event.code == ecodes.ABS_HAT0X and event.value:
+            return ecodes.KEY_RIGHT if event.value > 0 else ecodes.KEY_LEFT
+        if event.code == ecodes.ABS_HAT0Y and event.value:
+            return ecodes.KEY_DOWN if event.value > 0 else ecodes.KEY_UP
+    return None
+
+
 def run() -> None:
     ui = UInput({ecodes.EV_KEY: KEYS}, name="MoonlightOS Launcher Navigation")
     while True:
@@ -57,19 +75,7 @@ def run() -> None:
             for event in dev.read_loop():
                 if app_active():
                     continue
-                key = None
-                if event.type == ecodes.EV_KEY and event.value == 1:
-                    key = {ecodes.BTN_SOUTH: ecodes.KEY_ENTER,
-                           ecodes.BTN_EAST: ecodes.KEY_ESC,
-                           ecodes.BTN_DPAD_UP: ecodes.KEY_UP,
-                           ecodes.BTN_DPAD_DOWN: ecodes.KEY_DOWN,
-                           ecodes.BTN_DPAD_LEFT: ecodes.KEY_LEFT,
-                           ecodes.BTN_DPAD_RIGHT: ecodes.KEY_RIGHT}.get(event.code)
-                elif event.type == ecodes.EV_ABS:
-                    if event.code == ecodes.ABS_HAT0X and event.value:
-                        key = ecodes.KEY_RIGHT if event.value > 0 else ecodes.KEY_LEFT
-                    elif event.code == ecodes.ABS_HAT0Y and event.value:
-                        key = ecodes.KEY_DOWN if event.value > 0 else ecodes.KEY_UP
+                key = key_for_event(event)
                 if key:
                     emit(ui, key)
         except OSError:

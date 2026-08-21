@@ -45,6 +45,8 @@ report() {
   moonlightos-tailscale-diagnostics 2>&1 || true
   echo
   echo '== Display connectors / modes =='
+  wlr-randr 2>&1 || true
+  echo
   for connector in /sys/class/drm/card*-*/status; do
     [[ -e "$connector" ]] || continue
     base=${connector%/status}

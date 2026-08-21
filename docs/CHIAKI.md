@@ -19,5 +19,5 @@ it. HDR remains experimental and unclaimed.
 The PlayStation is expected to remain directly reachable on the MoonlightOS
 local LAN. Installing Tailscale on MoonlightOS does not make the console a
 tailnet node or extend discovery to another site. No subnet routes are accepted
-or advertised in v1.1; remote-console routing is a separately reviewed future
+or advertised in v0.1.2; remote-console routing is a separately reviewed future
 feature.

@@ -73,5 +73,5 @@ Neither control replaces the device allowlist.
 
 USB/IP has no built-in encryption or authentication. Tailscale supplies the
 encrypted overlay and identity policy, but DERP or peer-relay paths can still
-be too jittery for wheels/HOTAS devices. v1.1 does not add a separate remote
+be too jittery for wheels/HOTAS devices. v0.1.2 does not add a separate remote
 USB/IP automation daemon.

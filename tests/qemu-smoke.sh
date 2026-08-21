@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-1.1-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.2-amd64.iso}
 SCREENSHOT=${MOONLIGHTOS_QEMU_SCREENSHOT:-/tmp/moonlightos-qemu-smoke.ppm}
 command -v qemu-system-x86_64 >/dev/null || { echo 'qemu-system-x86_64 is required' >&2; exit 127; }
 [[ -f "$ISO" ]] || { echo "ISO not found: $ISO" >&2; exit 66; }
@@ -27,8 +27,12 @@ if command -v xorriso >/dev/null; then
   grub_cfg=$(mktemp)
   temporary_files+=("$grub_cfg")
   xorriso -osirrox on -indev "$ISO" -extract /boot/grub/grub.cfg "$grub_cfg" >/dev/null 2>&1
+  grep -q '^set default=0$' "$grub_cfg" || { echo 'ISO GRUB config lacks the default entry' >&2; exit 65; }
   grep -q '^set timeout=3$' "$grub_cfg" || { echo 'ISO GRUB config lacks the appliance timeout' >&2; exit 65; }
+  grep -q '^serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial setup' >&2; exit 65; }
+  grep -q '^terminal_input console serial$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial input' >&2; exit 65; }
   grep -q '^terminal_output console serial$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial output' >&2; exit 65; }
+  grep -q 'boot=live.*components.*persistence.*ipv6.disable=1.*console=tty1.*console=ttyS0,115200n8' "$grub_cfg" || { echo 'ISO GRUB config lacks expected live boot arguments' >&2; exit 65; }
 fi
 
 capture_screen() {
@@ -61,18 +65,27 @@ args=(
 # code image. A code-only pflash drive can stall before GRUB with no serial log.
 ovmf_code=
 ovmf_vars_template=
-for pair in \
-  '/usr/share/OVMF/OVMF_CODE_4M.fd|/usr/share/OVMF/OVMF_VARS_4M.fd' \
-  '/usr/share/OVMF/OVMF_CODE.fd|/usr/share/OVMF/OVMF_VARS.fd' \
-  '/usr/share/pve-edk2-firmware/OVMF_CODE_4M.fd|/usr/share/pve-edk2-firmware/OVMF_VARS_4M.fd'; do
-  code=${pair%%|*}
-  vars=${pair#*|}
-  if [[ -r "$code" && -r "$vars" ]]; then
-    ovmf_code=$code
-    ovmf_vars_template=$vars
-    break
-  fi
-done
+if [[ -n ${MOONLIGHTOS_OVMF_CODE:-} || -n ${MOONLIGHTOS_OVMF_VARS:-} ]]; then
+  [[ -r ${MOONLIGHTOS_OVMF_CODE:-} && -r ${MOONLIGHTOS_OVMF_VARS:-} ]] || {
+    echo 'Both readable MOONLIGHTOS_OVMF_CODE and MOONLIGHTOS_OVMF_VARS are required.' >&2
+    exit 69
+  }
+  ovmf_code=$MOONLIGHTOS_OVMF_CODE
+  ovmf_vars_template=$MOONLIGHTOS_OVMF_VARS
+else
+  for pair in \
+    '/usr/share/OVMF/OVMF_CODE_4M.fd|/usr/share/OVMF/OVMF_VARS_4M.fd' \
+    '/usr/share/OVMF/OVMF_CODE.fd|/usr/share/OVMF/OVMF_VARS.fd' \
+    '/usr/share/pve-edk2-firmware/OVMF_CODE_4M.fd|/usr/share/pve-edk2-firmware/OVMF_VARS_4M.fd'; do
+    code=${pair%%|*}
+    vars=${pair#*|}
+    if [[ -r "$code" && -r "$vars" ]]; then
+      ovmf_code=$code
+      ovmf_vars_template=$vars
+      break
+    fi
+  done
+fi
 if [[ -n "$ovmf_code" ]]; then
   ovmf_vars=$(mktemp)
   temporary_files+=("$ovmf_vars")

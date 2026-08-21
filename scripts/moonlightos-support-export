@@ -1,0 +1,636 @@
+#!/usr/bin/python3
+"""Create a redacted MoonlightOS support archive on validated removable media."""
+
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import os
+import pathlib
+import pwd
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tarfile
+import tempfile
+from datetime import datetime, timezone
+
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "launcher"))
+from moonlightos_support import (  # noqa: E402
+    Destination,
+    REQUEST,
+    RUN,
+    STATUS,
+    discover_destinations,
+    path_is_writable,
+    safe_terminal_text,
+)
+
+
+LOCK = RUN / "support-export.lock"
+MIN_FREE = 64 * 1024 * 1024
+MAX_COMMAND_OUTPUT = 16 * 1024 * 1024
+MAX_LOG_SIZE = 8 * 1024 * 1024
+SECRET_KEY = re.compile(
+    r"(?i)(password|passwd|passphrase|secret|private[_ -]?key|auth(?:entication)?[_ -]?key|"
+    r"api[_ -]?key|access[_ -]?token|refresh[_ -]?token|cookie|credential|pairing|registration)"
+)
+SECRET_ASSIGNMENT = re.compile(
+    r"(?im)(\b(?:password|passwd|passphrase|secret|private[_ -]?key|auth(?:entication)?[_ -]?key|"
+    r"api[_ -]?key|access[_ -]?token|refresh[_ -]?token|cookie|credential)\b\s*[:=]\s*)"
+    r"(?:\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\s,;]+)"
+)
+SECRET_JSON_ASSIGNMENT = re.compile(
+    r'(?i)("(?:password|passwd|passphrase|secret|private[_ -]?key|auth(?:entication)?[_ -]?key|'
+    r'api[_ -]?key|access[_ -]?token|refresh[_ -]?token|cookie|credential)"\s*:\s*)'
+    r'(?:"[^"\r\n]*"|[^,}\r\n]+)'
+)
+SECRET_CLI_ARGUMENT = re.compile(
+    r"(?i)(--(?:password|passwd|passphrase|secret|private-key|auth-key|api-key|"
+    r"access-token|refresh-token|cookie|credential)(?:=|\s+))\S+"
+)
+PEM_PRIVATE_KEY = re.compile(
+    r"-----BEGIN [^-\r\n]*PRIVATE KEY-----.*?-----END [^-\r\n]*PRIVATE KEY-----",
+    re.DOTALL | re.IGNORECASE,
+)
+CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x1b]")
+
+
+def redact_text(text: str) -> str:
+    text = PEM_PRIVATE_KEY.sub("[REDACTED]", text)
+    text = re.sub(r"(?i)\btskey-[A-Za-z0-9_-]+", "[REDACTED]", text)
+    text = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+", "Bearer [REDACTED]", text)
+    text = re.sub(r"(?i)https?://(?:login\.)?tailscale\.com/[^\s\"'<>]+", "[REDACTED]", text)
+    text = re.sub(
+        r"(?i)([?&](?:authkey|token|key)=)[^&\s\"'<>]+", r"\1[REDACTED]", text
+    )
+    text = SECRET_JSON_ASSIGNMENT.sub(r'\1"[REDACTED]"', text)
+    text = SECRET_CLI_ARGUMENT.sub(r"\1[REDACTED]", text)
+    text = SECRET_ASSIGNMENT.sub(r"\1[REDACTED]", text)
+    return CONTROL.sub("?", text)
+
+
+def redact_json(value: object, key: str = "") -> object:
+    if SECRET_KEY.search(key):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {str(item): redact_json(content, str(item)) for item, content in value.items()}
+    if isinstance(value, list):
+        return [redact_json(item, key) for item in value]
+    if isinstance(value, str):
+        return redact_text(value)
+    return value
+
+
+def sanitize_config(text: str) -> str:
+    output: list[str] = []
+    for line in text.splitlines():
+        if "=" in line:
+            key, _value = line.split("=", 1)
+            if SECRET_KEY.search(key):
+                line = f"{key.rstrip()} = [REDACTED]"
+        output.append(redact_text(line))
+    return "\n".join(output) + "\n"
+
+
+def write_text(path: pathlib.Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(redact_text(text), encoding="utf-8")
+
+
+def command_output(command: list[str], *, env: dict[str, str] | None = None) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            text=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            timeout=30,
+            env=env,
+        )
+        data = result.stdout[:MAX_COMMAND_OUTPUT]
+        suffix = "\n[output truncated]\n" if len(result.stdout) > len(data) else ""
+        return data.decode("utf-8", errors="replace") + suffix
+    except (OSError, subprocess.SubprocessError) as error:
+        return f"Command unavailable or failed: {error}\n"
+
+
+def add_command(bundle: pathlib.Path, name: str, command: list[str], **kwargs: object) -> None:
+    write_text(bundle / name, command_output(command, **kwargs))
+
+
+def add_file(bundle: pathlib.Path, name: str, source: pathlib.Path, *, config: bool = False) -> None:
+    try:
+        descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        with os.fdopen(descriptor, "rb") as stream:
+            data = stream.read(MAX_LOG_SIZE + 1)
+    except OSError as error:
+        write_text(bundle / name, f"Unavailable: {error}\n")
+        return
+    if len(data) > MAX_LOG_SIZE:
+        write_text(bundle / name, "File exceeded the support-archive size limit.\n")
+        return
+    if b"\0" in data:
+        write_text(bundle / name, "Binary file omitted.\n")
+        return
+    decoded = data.decode("utf-8", errors="replace")
+    write_text(bundle / name, sanitize_config(decoded) if config else decoded)
+
+
+def session_environment() -> dict[str, str]:
+    environment = {
+        "HOME": "/run/moonlightos",
+        "LANG": os.environ.get("LANG", "C.UTF-8"),
+        "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
+        "XDG_CACHE_HOME": "/run/moonlightos/support-cache",
+        "XDG_CONFIG_HOME": "/run/moonlightos/support-config",
+        "XDG_DATA_HOME": "/run/moonlightos/support-data",
+        "XDG_RUNTIME_DIR": "/run/moonlightos",
+    }
+    try:
+        descriptor = os.open(RUN / "session.env", os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        with os.fdopen(descriptor, "r", encoding="utf-8", errors="replace") as stream:
+            lines = stream.read(4096).splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key == "WAYLAND_DISPLAY" and re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+            environment[key] = value
+        elif key == "DISPLAY" and re.fullmatch(r":\d+(?:\.\d+)?", value):
+            environment[key] = value
+    return environment
+
+
+def user_command(command: list[str], environment: dict[str, str]) -> list[str]:
+    try:
+        pwd.getpwnam("moonlightos")
+    except KeyError:
+        return command
+    assignments = [f"{key}={value}" for key, value in environment.items()]
+    return ["runuser", "-u", "moonlightos", "--", "env", *assignments, *command]
+
+
+def collect(bundle: pathlib.Path) -> None:
+    generated = datetime.now(timezone.utc).isoformat()
+    version = pathlib.Path("/etc/moonlightos-version")
+    build_info = f"Generated: {generated}\n"
+    if version.exists():
+        build_info += f"MoonlightOS: {version.read_text(encoding='utf-8', errors='replace').strip()}\n"
+    add_file(bundle, "system/os-release.txt", pathlib.Path("/etc/os-release"))
+    write_text(bundle / "system/moonlightos-version-and-build.txt", build_info)
+    add_file(
+        bundle,
+        "system/installed-build-info.txt",
+        pathlib.Path("/usr/share/moonlightos/build-info"),
+    )
+    write_text(bundle / "system/date-utc.txt", generated + "\n")
+    add_command(bundle, "system/uptime.txt", ["uptime"])
+    add_file(bundle, "system/kernel-command-line.txt", pathlib.Path("/proc/cmdline"))
+    add_command(bundle, "system/kernel-version.txt", ["uname", "-a"])
+    add_command(bundle, "hardware/cpu.txt", ["lscpu"])
+    add_command(bundle, "hardware/memory.txt", ["free", "-h"])
+    add_file(bundle, "hardware/meminfo.txt", pathlib.Path("/proc/meminfo"))
+    add_command(bundle, "hardware/pci.txt", ["lspci", "-nnk"])
+    add_command(bundle, "hardware/usb.txt", ["lsusb", "-v"])
+    add_command(bundle, "hardware/loaded-modules.txt", ["lsmod"])
+    gpu = command_output(["lspci", "-nnk"])
+    gpu_lines = []
+    include = 0
+    for line in gpu.splitlines():
+        if re.search(r"VGA|Display|3D controller", line, re.IGNORECASE):
+            include = 4
+        if include:
+            gpu_lines.append(line)
+            include -= 1
+    write_text(bundle / "hardware/gpu-driver.txt", "\n".join(gpu_lines) + "\n")
+
+    drm_lines: list[str] = []
+    for status_path in sorted(pathlib.Path("/sys/class/drm").glob("card*-*/status")):
+        if status_path.is_symlink() or not status_path.is_file():
+            continue
+        connector = status_path.parent.name
+        try:
+            status = status_path.read_text(encoding="utf-8", errors="replace").strip()
+            modes = (status_path.parent / "modes").read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+        except OSError:
+            continue
+        drm_lines.append(f"{connector}: {status}")
+        drm_lines.extend(f"  {mode}" for mode in modes)
+    write_text(bundle / "display/drm-connectors-and-modes.txt", "\n".join(drm_lines) + "\n")
+
+    environment = session_environment()
+    add_command(
+        bundle,
+        "display/wlr-randr.txt",
+        user_command(["wlr-randr"], environment),
+        env=environment,
+    )
+    add_command(
+        bundle,
+        "graphics/vulkan-summary.txt",
+        user_command(["vulkaninfo", "--summary"], environment),
+        env=environment,
+    )
+    add_command(
+        bundle,
+        "graphics/va-api-capabilities.txt",
+        user_command(["vainfo"], environment),
+        env=environment,
+    )
+    add_command(
+        bundle,
+        "audio/pipewire-wireplumber.txt",
+        user_command(["wpctl", "status"], environment),
+        env=environment,
+    )
+    add_command(bundle, "audio/alsa-devices.txt", ["aplay", "-l"])
+    add_command(bundle, "network/networkmanager.txt", ["nmcli", "device", "show"])
+    add_command(bundle, "network/ipv4-addresses.txt", ["ip", "-4", "address", "show"])
+    add_command(bundle, "network/routes.txt", ["ip", "route", "show", "table", "all"])
+    add_command(bundle, "network/link-state.txt", ["ip", "-details", "link", "show"])
+    add_command(bundle, "network/dns-state.txt", ["resolvectl", "status"])
+
+    tailscale_raw = command_output(["tailscale", "status", "--json"])
+    try:
+        tailscale = json.loads(tailscale_raw)
+        tailscale_text = json.dumps(redact_json(tailscale), indent=2, sort_keys=True) + "\n"
+    except json.JSONDecodeError:
+        tailscale_text = redact_text(tailscale_raw)
+    write_text(bundle / "network/tailscale-sanitized.json", tailscale_text)
+    add_command(bundle, "usbip/state.txt", ["moonlightos-usbip", "status"])
+    add_command(bundle, "firewall/nftables-ruleset.txt", ["nft", "list", "ruleset"])
+    add_command(
+        bundle,
+        "software/relevant-packages.txt",
+        [
+            "dpkg-query",
+            "-W",
+            "-f=${binary:Package}\t${Version}\n",
+            "cage",
+            "firefox-esr",
+            "linux-image-amd64",
+            "mesa-vulkan-drivers",
+            "network-manager",
+            "pipewire",
+            "tailscale",
+            "wireplumber",
+            "wlr-randr",
+            "xwayland",
+        ],
+    )
+    add_file(
+        bundle,
+        "software/pinned-applications.txt",
+        pathlib.Path("/usr/share/moonlightos/applications.lock"),
+    )
+    add_file(
+        bundle,
+        "software/pinned-sources.txt",
+        pathlib.Path("/usr/share/moonlightos/sources.lock"),
+    )
+    add_command(
+        bundle,
+        "services/moonlightos-services.txt",
+        ["systemctl", "--no-pager", "--full", "status", "moonlightos-*"],
+    )
+    add_command(
+        bundle,
+        "services/failed-units.txt",
+        ["systemctl", "--no-pager", "--failed"],
+    )
+    add_command(
+        bundle,
+        "logs/current-boot-journal.txt",
+        ["journalctl", "-b", "--no-pager", "--output=short-iso"],
+    )
+    add_command(bundle, "logs/kernel-log.txt", ["dmesg", "--color=never"])
+
+    log_dir = pathlib.Path(os.environ.get("MOONLIGHTOS_SUPPORT_LOG_DIR", "/var/log/moonlightos"))
+    try:
+        entries = sorted(log_dir.iterdir(), key=lambda item: item.name)
+    except OSError:
+        entries = []
+    copied = 0
+    log_index: list[str] = []
+    for entry in entries:
+        try:
+            info = entry.lstat()
+        except OSError:
+            continue
+        if not stat.S_ISREG(info.st_mode):
+            continue
+        copied += 1
+        archive_name = f"log-{copied:03d}.txt"
+        log_index.append(f"{archive_name} = {safe_terminal_text(entry.name)}")
+        add_file(bundle, f"logs/moonlightos/{archive_name}", entry)
+    write_text(
+        bundle / "logs/moonlightos/INDEX.txt",
+        "\n".join(log_index) + ("\n" if log_index else "No regular log files were available.\n"),
+    )
+
+    config = pathlib.Path(
+        os.environ.get("MOONLIGHTOS_SUPPORT_CONFIG", "/var/lib/moonlightos/config.ini")
+    )
+    add_file(bundle, "configuration/config.ini.sanitized", config, config=True)
+    write_text(
+        bundle / "REDACTION.txt",
+        "Sensitive values and enrollment URLs were replaced with [REDACTED]. "
+        "Application/browser profiles and private state directories are not collected.\n",
+    )
+
+
+def create_manifest(bundle: pathlib.Path) -> None:
+    lines = []
+    for path in sorted(bundle.rglob("*")):
+        if path.is_file() and not path.is_symlink() and path.name != "MANIFEST.sha256":
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            lines.append(f"{digest}  {path.relative_to(bundle).as_posix()}")
+    (bundle / "MANIFEST.sha256").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def verify_archive(archive: pathlib.Path) -> None:
+    with tarfile.open(archive, "r:gz") as container:
+        members = container.getmembers()
+        if any(member.issym() or member.islnk() for member in members):
+            raise RuntimeError("support archive unexpectedly contains a link")
+        manifest_member = next(
+            (member for member in members if member.name.endswith("/MANIFEST.sha256")), None
+        )
+        if manifest_member is None:
+            raise RuntimeError("support archive manifest is missing")
+        manifest_stream = container.extractfile(manifest_member)
+        if manifest_stream is None:
+            raise RuntimeError("support archive manifest is unreadable")
+        for line in manifest_stream.read().decode("utf-8").splitlines():
+            digest, relative = line.split("  ", 1)
+            member = container.getmember(f"moonlightos-support/{relative}")
+            stream = container.extractfile(member)
+            if stream is None or hashlib.sha256(stream.read()).hexdigest() != digest:
+                raise RuntimeError(f"support archive manifest mismatch: {relative}")
+
+
+def free_bytes(path: pathlib.Path) -> int:
+    stats = os.statvfs(path)
+    return stats.f_bavail * stats.f_frsize
+
+
+def validate_destination(request: dict[str, object]) -> Destination:
+    requested = Destination(
+        str(request.get("device") or ""),
+        str(request.get("mountpoint") or ""),
+        str(request.get("label") or ""),
+        str(request.get("fstype") or ""),
+        request.get("mounted") is True,
+        str(request.get("majmin") or ""),
+        str(request.get("uuid") or ""),
+    )
+    for candidate in discover_destinations():
+        if candidate.device != requested.device or candidate.mountpoint != requested.mountpoint:
+            continue
+        if requested.majmin and candidate.majmin != requested.majmin:
+            continue
+        if requested.uuid and candidate.uuid != requested.uuid:
+            continue
+        return candidate
+    raise RuntimeError("selected removable destination is no longer valid")
+
+
+def mount_labeled_destination(destination: Destination) -> tuple[Destination, bool]:
+    if destination.mounted:
+        return destination, False
+    if destination.label != "MOONLIGHTOS_SUPPORT" or not destination.device.startswith("/dev/"):
+        raise RuntimeError("unmounted destination is not an explicitly labeled support partition")
+    mountpoint = RUN / "support-media"
+    mountpoint.mkdir(mode=0o700, exist_ok=True)
+    if os.path.ismount(mountpoint):
+        raise RuntimeError("temporary support mountpoint is already in use")
+    result = subprocess.run(
+        ["mount", "-o", "nosuid,nodev,noexec", "--", destination.device, str(mountpoint)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=15,
+    )
+    if result.returncode:
+        raise RuntimeError((result.stderr or "could not mount support partition").strip())
+    mounted = Destination(
+        destination.device,
+        str(mountpoint),
+        destination.label,
+        destination.fstype,
+        True,
+        destination.majmin,
+        destination.uuid,
+    )
+    if not path_is_writable(str(mountpoint)):
+        subprocess.run(["umount", "--", str(mountpoint)], check=False)
+        raise RuntimeError("support partition mounted read-only")
+    return mounted, True
+
+
+def read_request() -> dict[str, object]:
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(REQUEST, flags)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 8192:
+            raise RuntimeError("invalid support request file")
+        try:
+            expected_uid = pwd.getpwnam("moonlightos").pw_uid
+        except KeyError:
+            expected_uid = info.st_uid
+        if info.st_uid != expected_uid:
+            raise RuntimeError("support request has an unexpected owner")
+        data = os.read(descriptor, 8193)
+    finally:
+        os.close(descriptor)
+    payload = json.loads(data.decode("utf-8"))
+    if not isinstance(payload, dict) or not re.fullmatch(
+        r"[0-9a-f]{24}", str(payload.get("request_id") or "")
+    ):
+        raise RuntimeError("invalid support request contents")
+    return payload
+
+
+def write_status(request_id: str, state: str, message: str, destination: str = "") -> None:
+    payload = {
+        "request_id": request_id,
+        "state": state,
+        "message": safe_terminal_text(message, 240),
+        "destination": safe_terminal_text(destination, 240),
+    }
+    descriptor, temporary = tempfile.mkstemp(prefix=".support-status.", dir=RUN)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, STATUS)
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def file_sha256(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def atomic_export(source: pathlib.Path, destination: pathlib.Path, filename: str) -> pathlib.Path:
+    final = destination / filename
+    sidecar = destination / f"{filename}.sha256"
+    partial = destination / f".{filename}.partial"
+    side_partial = destination / f".{filename}.sha256.partial"
+    created_final = False
+    if final.exists() or sidecar.exists():
+        raise RuntimeError("support archive filename already exists")
+    try:
+        with source.open("rb") as incoming, partial.open("xb") as outgoing:
+            shutil.copyfileobj(incoming, outgoing, 1024 * 1024)
+            os.fchmod(outgoing.fileno(), 0o644)
+            outgoing.flush()
+            os.fsync(outgoing.fileno())
+        if file_sha256(partial) != file_sha256(source):
+            raise RuntimeError("copied support archive hash mismatch")
+        verify_archive(partial)
+        os.replace(partial, final)
+        created_final = True
+        digest = file_sha256(final)
+        with side_partial.open("x", encoding="ascii") as stream:
+            stream.write(f"{digest}  {filename}\n")
+            os.fchmod(stream.fileno(), 0o644)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(side_partial, sidecar)
+        directory_fd = os.open(destination, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+        os.sync()
+        return final
+    except Exception:
+        for path in (partial, side_partial, sidecar):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+        if created_final:
+            try:
+                final.unlink()
+            except FileNotFoundError:
+                pass
+        raise
+
+
+def archive_filename() -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ")
+    machine_id_path = pathlib.Path(
+        os.environ.get("MOONLIGHTOS_SUPPORT_MACHINE_ID", "/etc/machine-id")
+    )
+    try:
+        machine_id = re.sub(
+            r"[^0-9a-f]", "", machine_id_path.read_text(encoding="ascii").lower()
+        )[:8]
+    except OSError:
+        machine_id = ""
+    return f"moonlightos-support-{timestamp}-{machine_id or 'unknown'}.tar.gz"
+
+
+def run() -> int:
+    RUN.mkdir(mode=0o750, parents=True, exist_ok=True)
+    request_id = "unknown"
+    mounted_here = False
+    destination: Destination | None = None
+    lock_stream = LOCK.open("a+")
+    try:
+        fcntl.flock(lock_stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return 75
+    try:
+        request = read_request()
+        request_id = str(request["request_id"])
+        REQUEST.unlink(missing_ok=True)
+        write_status(request_id, "working", "Collecting support information")
+        destination = validate_destination(request)
+        destination, mounted_here = mount_labeled_destination(destination)
+        target = pathlib.Path(destination.mountpoint)
+        if free_bytes(target) < MIN_FREE:
+            raise RuntimeError("destination has less than 64 MiB free")
+
+        temporary_root = pathlib.Path(
+            tempfile.mkdtemp(prefix="moonlightos-support-", dir=os.environ.get("TMPDIR"))
+        )
+        try:
+            if free_bytes(temporary_root) < MIN_FREE:
+                raise RuntimeError("temporary filesystem has less than 64 MiB free")
+            bundle = temporary_root / "moonlightos-support"
+            bundle.mkdir()
+            collect(bundle)
+            create_manifest(bundle)
+            local_archive = temporary_root / archive_filename()
+            with tarfile.open(local_archive, "w:gz", dereference=False) as container:
+                container.add(bundle, arcname="moonlightos-support", recursive=True)
+            verify_archive(local_archive)
+
+            # Revalidate the selected device/mount immediately before writing.
+            if not os.path.ismount(target) or not path_is_writable(str(target)):
+                raise RuntimeError("support destination disappeared before writing")
+            current = validate_destination(
+                {
+                    "device": destination.device,
+                    "mountpoint": destination.mountpoint,
+                    "label": destination.label,
+                    "fstype": destination.fstype,
+                    "mounted": True,
+                    "majmin": destination.majmin,
+                    "uuid": destination.uuid,
+                }
+            )
+            if current.device != destination.device:
+                raise RuntimeError("support destination changed before writing")
+            if free_bytes(target) < local_archive.stat().st_size + 8 * 1024 * 1024:
+                raise RuntimeError("destination does not have enough free space")
+            final = atomic_export(local_archive, target, local_archive.name)
+        finally:
+            shutil.rmtree(temporary_root, ignore_errors=True)
+
+        shown = f"{destination.device}:/{final.name}" if mounted_here else str(final)
+        write_status(request_id, "success", "Support file created", shown)
+        return 0
+    except Exception as error:
+        REQUEST.unlink(missing_ok=True)
+        write_status(request_id, "failed", str(error))
+        return 1
+    finally:
+        if mounted_here and destination is not None:
+            subprocess.run(
+                ["umount", "--", destination.mountpoint],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=15,
+            )
+        lock_stream.close()
+
+
+if __name__ == "__main__":
+    raise SystemExit(run())

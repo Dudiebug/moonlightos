@@ -27,11 +27,11 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 1.1 ]]
+[[ "$(< VERSION)" == 0.1.2 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-1\.1-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.2-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
 rg -q '^  actions: read$' .github/workflows/release-v1.1.yml
-rg -q 'git/matching-refs/tags/v1\.1' .github/workflows/release-v1.1.yml
+rg -q 'git/matching-refs/tags/v0\.1\.2' .github/workflows/release-v1.1.yml
 ! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v1.1.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
@@ -55,6 +55,7 @@ rg -q 'binary=/usr/bin/firefox-esr' scripts/moonlightos-run-app
 rg -q 'unsquashfs -quiet -offset' build/configure.sh
 rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^wlr-randr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'qrencode -t ANSIUTF8' scripts/moonlightos-tailscale-enrollment
 ! rg -q 'python3-gi|gir1.2-gtk|libfuse' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
@@ -70,9 +71,20 @@ rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
 rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-smoke.service
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q 'moonlightos-support-export.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q '^PathExists=/run/moonlightos/support-export.request$' services/moonlightos-support-export.path
+rg -q '^ExecStart=/usr/libexec/moonlightos-support-export$' services/moonlightos-support-export.service
+rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale' services/moonlightos-support-export.service
+! rg -q '\bsudo\b' launcher scripts/moonlightos-support-export services/moonlightos-support-export.service
+rg -q '\["wlr-randr", "--output"' launcher/moonlightos_display.py
+rg -q 'append\("--dryrun"\)' launcher/moonlightos_display.py
+rg -q 'support-export.request' launcher/moonlightos_support.py
+rg -q 'MANIFEST\.sha256' scripts/moonlightos-support-export tests/test_support.py
+rg -q 'MIN_FREE' scripts/moonlightos-support-export
 
-python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
-  scripts/moonlightos-host-address
+python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_display.py \
+  launcher/moonlightos_support.py launcher/gamepad-nav.py scripts/moonlightos-host-address \
+  scripts/moonlightos-support-export
 
 python3 - <<'PY'
 import configparser, pathlib, re, subprocess
@@ -131,6 +143,8 @@ for required in \
   services/moonlightos-firefox.service \
   services/moonlightos-firefox.path \
   services/moonlightos-qemu-smoke.service \
+  services/moonlightos-support-export.path \
+  services/moonlightos-support-export.service \
   services/moonlightos-usbipd.service \
   services/moonlightos-network-ready.service \
   services/moonlightos-tailscale-enroll.service; do
