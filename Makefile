@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-ISO := build/out/moonlightos-1.1-amd64.iso
+ISO := build/out/moonlightos-0.1.2-amd64.iso
 
 .PHONY: help fetch-apps configure build checksum test qemu-smoke clean
 
@@ -30,6 +30,7 @@ checksum:
 test:
 	./tests/test-static.sh
 	python3 -m unittest -v tests/test_host_address.py
+	python3 -m unittest -v tests/test_support.py
 	$(MAKE) -C launcher test
 
 

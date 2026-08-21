@@ -31,6 +31,7 @@ cage
 seatd
 xwayland
 foot
+wlr-randr
 firefox-esr
 gamescope/trixie-backports
 python3

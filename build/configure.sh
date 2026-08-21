@@ -23,8 +23,11 @@ install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
 
 install -D -m 0755 "$ROOT/launcher/moonlightos-launcher.py" "$CHROOT/usr/libexec/moonlightos-launcher"
 install -D -m 0755 "$ROOT/launcher/gamepad-nav.py" "$CHROOT/usr/libexec/moonlightos-gamepad-nav"
+install -D -m 0644 "$ROOT/launcher/moonlightos_display.py" "$CHROOT/usr/libexec/moonlightos_display.py"
+install -D -m 0644 "$ROOT/launcher/moonlightos_support.py" "$CHROOT/usr/libexec/moonlightos_support.py"
 install -D -m 0755 "$ROOT/scripts/moonlightos-run-app" "$CHROOT/usr/libexec/moonlightos-run-app"
 install -D -m 0755 "$ROOT/scripts/moonlightos-qemu-smoke" "$CHROOT/usr/libexec/moonlightos-qemu-smoke"
+install -D -m 0755 "$ROOT/scripts/moonlightos-support-export" "$CHROOT/usr/libexec/moonlightos-support-export"
 install -D -m 0755 "$ROOT/scripts/moonlightos-diagnostics" "$CHROOT/usr/bin/moonlightos-diagnostics"
 install -D -m 0755 "$ROOT/scripts/moonlightos-network-ready" "$CHROOT/usr/libexec/moonlightos-network-ready"
 install -D -m 0755 "$ROOT/scripts/moonlightos-firewall" "$CHROOT/usr/libexec/moonlightos-firewall"
@@ -37,6 +40,16 @@ install -D -m 0755 "$ROOT/usbip/moonlightos-usbip" "$CHROOT/usr/sbin/moonlightos
 install -D -m 0644 "$ROOT/config/default/moonlightos" "$CHROOT/etc/default/moonlightos"
 install -D -m 0644 "$ROOT/config/nftables/moonlightos.nft" "$CHROOT/etc/moonlightos/nftables.template"
 install -D -m 0644 "$ROOT/usbip/usbip-allowlist.conf" "$CHROOT/etc/moonlightos/usbip-allowlist.conf"
+install -D -m 0644 "$ROOT/build/applications.lock" \
+  "$CHROOT/usr/share/moonlightos/applications.lock"
+install -D -m 0644 "$ROOT/build/sources.lock" \
+  "$CHROOT/usr/share/moonlightos/sources.lock"
+build_commit=$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf unknown)
+build_state=clean
+git -C "$ROOT" status --porcelain --untracked-files=normal 2>/dev/null | grep -q . && build_state=modified
+printf 'MoonlightOS: %s\nSource commit: %s\nSource state: %s\nBuild date: %s\n' \
+  "$(< "$ROOT/VERSION")" "$build_commit" "$build_state" "$(date --utc --iso-8601=seconds)" \
+  > "$CHROOT/usr/share/moonlightos/build-info"
 
 for unit in "$ROOT"/services/*; do
   install -D -m 0644 "$unit" "$CHROOT/etc/systemd/system/$(basename "$unit")"
