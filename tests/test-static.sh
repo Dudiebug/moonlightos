@@ -39,6 +39,8 @@ rg -q '/usr/bin/cage -s -- /usr/bin/foot --fullscreen' services/moonlightos-laun
 rg -q '^Environment=QT_QPA_PLATFORM=xcb$' services/moonlightos-moonlight.service
 rg -q '^Environment=QT_QPA_PLATFORM=wayland$' services/moonlightos-chiaki.service
 rg -q '^EnvironmentFile=-/run/moonlightos/session.env$' services/moonlightos-{moonlight,chiaki}.service
+rg -q '^ConditionFileIsExecutable=/opt/moonlightos/apps/moonlight/usr/bin/moonlight$' services/moonlightos-moonlight.service
+rg -q '^ConditionFileIsExecutable=/opt/moonlightos/apps/chiaki-ng/usr/bin/chiaki$' services/moonlightos-chiaki.service
 rg -q 'binary=\$appdir/usr/bin/moonlight' scripts/moonlightos-run-app
 rg -q 'binary=\$appdir/usr/bin/chiaki' scripts/moonlightos-run-app
 rg -q 'unsquashfs -quiet -offset' build/configure.sh

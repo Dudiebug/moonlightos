@@ -1,7 +1,7 @@
 [Unit]
 Description=MoonlightOS chiaki-ng client
 After=moonlightos-launcher.service
-ConditionFileIsExecutable=/opt/moonlightos/apps/chiaki-ng.AppImage
+ConditionFileIsExecutable=/opt/moonlightos/apps/chiaki-ng/usr/bin/chiaki
 StartLimitIntervalSec=60
 StartLimitBurst=3
 

@@ -1,7 +1,7 @@
 [Unit]
 Description=MoonlightOS Moonlight client
 After=moonlightos-launcher.service
-ConditionFileIsExecutable=/opt/moonlightos/apps/moonlight.AppImage
+ConditionFileIsExecutable=/opt/moonlightos/apps/moonlight/usr/bin/moonlight
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
