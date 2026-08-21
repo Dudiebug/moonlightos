@@ -7,7 +7,7 @@ out, or unavailable.
 
 ## Package provenance
 
-v0.1 installs `tailscale` version `1.102.3` from Tailscale's official stable
+v1.1 installs `tailscale` version `1.102.3` from Tailscale's official stable
 Debian Trixie repository:
 
 ```text
@@ -160,7 +160,7 @@ USB/IP remains LAN-only unless both `remote_usbip = true` and one literal
 can be unsuitable for latency-sensitive devices.
 
 chiaki-ng runs locally on MoonlightOS and expects the PlayStation on the local
-LAN. Tailscale does not turn a PlayStation into a tailnet node. v0.1 does not
+LAN. Tailscale does not turn a PlayStation into a tailnet node. v1.1 does not
 enable a [subnet router](https://tailscale.com/docs/features/subnet-routers) or
 an [exit node](https://tailscale.com/docs/features/exit-nodes); reaching a
-console on another LAN is deferred to a separately reviewed v0.2 design.
+console on another LAN is deferred to a separately reviewed future design.

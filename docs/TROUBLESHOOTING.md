@@ -29,5 +29,5 @@ internet.
 4. If it still stops, capture the exact last message or a photo. Serial boot
    output is available at 115200 8N1 for development builds.
 
-IPv6 is intentionally unavailable in v0.1. Use `ip -4 address` and `ip -4
+IPv6 is intentionally unavailable in v1.1. Use `ip -4 address` and `ip -4
 route` when troubleshooting networking.

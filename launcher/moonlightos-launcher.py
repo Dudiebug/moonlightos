@@ -14,12 +14,13 @@ RUN = pathlib.Path("/run/moonlightos")
 MENU = (
     ("MOONLIGHT", "moonlight"),
     ("CHIAKI-NG", "chiaki"),
+    ("FIREFOX", "firefox"),
     ("TAILSCALE", "tailscale"),
     ("SETTINGS", "settings"),
     ("REBOOT", "reboot"),
     ("SHUTDOWN", "poweroff"),
 )
-GAP_BEFORE = {3, 4}
+GAP_BEFORE = {4, 5}
 
 
 def get_ipv4(output: str) -> str:
@@ -136,6 +137,8 @@ class Launcher:
             self.request("start-moonlight")
         elif action == "chiaki":
             self.request("start-chiaki")
+        elif action == "firefox":
+            self.request("start-firefox")
         elif action == "tailscale":
             self.request("tailscale-enroll")
             self.terminal_command(["moonlightos-tailscale-enrollment"])

@@ -17,7 +17,7 @@ sudo apt install qemu-system-x86 ovmf
 make qemu-smoke
 ```
 
-The script boots `build/out/moonlightos-0.1.0-alpha-amd64.iso` with serial
+The script boots `build/out/moonlightos-1.1-amd64.iso` with serial
 output, a virtual Ethernet NIC, and UEFI when OVMF is available. Success means
 the boot reached the MoonlightOS launcher service marker. QEMU does not prove
 Intel VA-API, display audio, gamepad, USB/IP hardware, or streaming.
@@ -33,11 +33,12 @@ test also extracts `/boot/grub/grub.cfg` from the ISO and verifies the appliance
 timeout and serial settings before starting the VM.
 
 Success requires `MOONLIGHTOS_LAUNCHER_READY`, emitted only after foot presents
-the full-screen curses launcher. A QEMU-only firmware flag then starts the two
-production application services and requires both `MOONLIGHTOS_APP_STARTED moonlight` and
-`MOONLIGHTOS_APP_STARTED chiaki-ng` after each real client remains alive for five
-seconds. Launcher output is mirrored to the boot console and remains available
-in `/var/log/moonlightos/launcher.log`.
+the full-screen curses launcher. A QEMU-only firmware flag then starts the three
+production application services and requires `MOONLIGHTOS_APP_STARTED moonlight`,
+`MOONLIGHTOS_APP_STARTED chiaki-ng`, and `MOONLIGHTOS_APP_STARTED firefox`
+after each real application remains alive for five seconds. Launcher output is
+mirrored to the boot console and remains available in
+`/var/log/moonlightos/launcher.log`.
 
 ## Installed-system QEMU procedure
 
@@ -48,7 +49,7 @@ and complete Debian Installer manually:
 qemu-img create -f qcow2 build/out/moonlightos-install-test.qcow2 24G
 qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom build/out/moonlightos-0.1.0-alpha-amd64.iso \
+  -cdrom build/out/moonlightos-1.1-amd64.iso \
   -drive file=build/out/moonlightos-install-test.qcow2,if=virtio \
   -device virtio-vga -display gtk \
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0

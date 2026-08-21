@@ -8,6 +8,7 @@ LOG_DIR=${MOONLIGHTOS_LOG_DIR:-/var/log/moonlightos}
 DATA_DIR=${MOONLIGHTOS_DATA_DIR:-/var/lib/moonlightos}
 mkdir -p "$LOG_DIR" "$DATA_DIR/home/.config" "$DATA_DIR/home/.cache"
 
+appdir=
 case "$APP" in
   moonlight)
     request=/run/moonlightos/start-moonlight
@@ -19,6 +20,10 @@ case "$APP" in
     appdir=/opt/moonlightos/apps/chiaki-ng
     binary=$appdir/usr/bin/chiaki
     ;;
+  firefox)
+    request=/run/moonlightos/start-firefox
+    binary=/usr/bin/firefox-esr
+    ;;
   *)
     echo "Unknown application: $APP" >&2
     exit 64
@@ -28,9 +33,11 @@ rm -f -- "$request"
 
 [[ -x "$binary" ]] || { echo "Application executable is missing: $binary" >&2; exit 66; }
 exec > >(tee -a "$LOG_DIR/$APP.log") 2>&1
-export APPDIR="$appdir"
-export PATH="$appdir/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [[ -n "$appdir" ]]; then
+  export APPDIR="$appdir"
+  export PATH="$appdir/usr/bin:$PATH"
+  export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 touch /run/moonlightos/app-active
 ready=/run/moonlightos/$APP-ready
 rm -f -- "$ready"
@@ -73,7 +80,7 @@ PY
     run_client env QT_QPA_PLATFORM=xcb "$binary"
   fi
   rc=$?
-else
+elif [[ "$APP" == chiaki-ng ]]; then
   gamescope_enabled=${MOONLIGHTOS_CHIAKI_GAMESCOPE:-0}
   if [[ -r "$DATA_DIR/config.ini" ]]; then
     configured=$(sed -n 's/^[[:space:]]*gamescope[[:space:]]*=[[:space:]]*//p' "$DATA_DIR/config.ini" | tail -1)
@@ -84,6 +91,9 @@ else
   else
     run_client env QT_QPA_PLATFORM=wayland SDL_AUDIODRIVER=pipewire "$binary"
   fi
+  rc=$?
+else
+  run_client "$binary"
   rc=$?
 fi
 set -e
