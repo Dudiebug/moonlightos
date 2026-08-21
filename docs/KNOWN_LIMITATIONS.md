@@ -7,8 +7,8 @@
   payloads are extracted into the image at build time. Native source-built
   Debian packages remain a future goal.
 - 4K60 SDR is best effort. HDR is unverified and unsupported for acceptance.
-- The installed root filesystem is writable; A/B read-only updates are v0.2.
-- Wi-Fi and Bluetooth configuration are outside v0.1.
+- The installed root filesystem is writable; A/B read-only updates are deferred.
+- Wi-Fi and Bluetooth configuration are outside v1.1.
 - Tailscale is installed but unauthenticated and optional. No subnet router,
   exit node, Serve, Funnel, public ingress, route acceptance, or advertised
   route is configured.
@@ -16,5 +16,5 @@
   CLI argument. Manual host entry is documented; setting a profile `app`
   enables direct CLI streaming.
 - Tailscale relay paths may not sustain game streaming or USB/IP latency.
-- A remote PlayStation is not reached through Tailscale in v0.1; a deliberately
+- A remote PlayStation is not reached through Tailscale in v1.1; a deliberately
   designed subnet-router deployment is deferred.

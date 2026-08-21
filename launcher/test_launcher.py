@@ -1,6 +1,8 @@
 import importlib.util
 import pathlib
+import tempfile
 import unittest
+from unittest import mock
 
 
 class LauncherHelpersTest(unittest.TestCase):
@@ -23,8 +25,25 @@ class LauncherHelpersTest(unittest.TestCase):
         labels = [label for label, _action in self.module.MENU]
         self.assertEqual(
             labels,
-            ["MOONLIGHT", "CHIAKI-NG", "TAILSCALE", "SETTINGS", "REBOOT", "SHUTDOWN"],
+            [
+                "MOONLIGHT",
+                "CHIAKI-NG",
+                "FIREFOX",
+                "TAILSCALE",
+                "SETTINGS",
+                "REBOOT",
+                "SHUTDOWN",
+            ],
         )
+
+    def test_firefox_menu_requests_service(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            self.module, "RUN", pathlib.Path(directory)
+        ):
+            launcher = object.__new__(self.module.Launcher)
+            launcher.selected = 2
+            launcher.activate()
+            self.assertTrue((pathlib.Path(directory) / "start-firefox").exists())
 
 
 if __name__ == "__main__":

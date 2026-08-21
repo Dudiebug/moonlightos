@@ -27,23 +27,31 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
+[[ "$(< VERSION)" == 1.1 ]]
+cmp -s VERSION overlay/etc/moonlightos-version
+rg -q 'moonlightos-1\.1-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q '^  actions: read$' .github/workflows/release-v1.1.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
 ! rg -q 'Before=.*moonlightos-launcher.service' services/moonlightos-network-ready.service
-! rg -q 'moonlightos-network-ready.service' services/moonlightos-{moonlight,chiaki}.service
+! rg -q 'moonlightos-network-ready.service' services/moonlightos-{moonlight,chiaki,firefox}.service
 rg -q 'MOONLIGHTOS_LAUNCHER_READY' services/moonlightos-launcher.service tests/qemu-smoke.sh
 rg -q 'StandardOutput=journal\+console' services/moonlightos-launcher.service
 ! rg -q '^Environment=WAYLAND_DISPLAY=' services/moonlightos-launcher.service
 rg -q '/usr/bin/cage -s -- /usr/bin/foot --fullscreen' services/moonlightos-launcher.service
 rg -q '^Environment=QT_QPA_PLATFORM=xcb$' services/moonlightos-moonlight.service
 rg -q '^Environment=QT_QPA_PLATFORM=wayland$' services/moonlightos-chiaki.service
-rg -q '^EnvironmentFile=-/run/moonlightos/session.env$' services/moonlightos-{moonlight,chiaki}.service
+rg -q '^Environment=MOZ_ENABLE_WAYLAND=1$' services/moonlightos-firefox.service
+rg -q '^EnvironmentFile=-/run/moonlightos/session.env$' services/moonlightos-{moonlight,chiaki,firefox}.service
 rg -q '^ConditionFileIsExecutable=/opt/moonlightos/apps/moonlight/usr/bin/moonlight$' services/moonlightos-moonlight.service
 rg -q '^ConditionFileIsExecutable=/opt/moonlightos/apps/chiaki-ng/usr/bin/chiaki$' services/moonlightos-chiaki.service
+rg -q '^ConditionFileIsExecutable=/usr/bin/firefox-esr$' services/moonlightos-firefox.service
 rg -q 'binary=\$appdir/usr/bin/moonlight' scripts/moonlightos-run-app
 rg -q 'binary=\$appdir/usr/bin/chiaki' scripts/moonlightos-run-app
+rg -q 'binary=/usr/bin/firefox-esr' scripts/moonlightos-run-app
 rg -q 'unsquashfs -quiet -offset' build/configure.sh
+rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'qrencode -t ANSIUTF8' scripts/moonlightos-tailscale-enrollment
 ! rg -q 'python3-gi|gir1.2-gtk|libfuse' config/live-build/package-lists/moonlightos.list.chroot
@@ -54,9 +62,12 @@ rg -q '/boot/grub/grub.cfg' tests/qemu-smoke.sh
 rg -q 'MOONLIGHTOS_APP_STARTED' scripts/moonlightos-run-app
 rg -q 'moonlight-ready' scripts/moonlightos-qemu-smoke
 rg -q 'chiaki-ng-ready' scripts/moonlightos-qemu-smoke
+rg -q 'firefox-ready' scripts/moonlightos-qemu-smoke
+rg -q 'systemctl start --no-block moonlightos-firefox.service' scripts/moonlightos-qemu-smoke
 rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
 rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-smoke.service
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
+rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address
@@ -91,6 +102,9 @@ for required in \
   services/moonlightos-launcher.service \
   services/moonlightos-moonlight.service \
   services/moonlightos-chiaki.service \
+  services/moonlightos-firefox.service \
+  services/moonlightos-firefox.path \
+  services/moonlightos-qemu-smoke.service \
   services/moonlightos-usbipd.service \
   services/moonlightos-network-ready.service \
   services/moonlightos-tailscale-enroll.service; do
