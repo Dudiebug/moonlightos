@@ -24,7 +24,7 @@ loader.exec_module(exporter)
 
 
 class DestinationTest(unittest.TestCase):
-    def test_selects_mounted_removable_and_labeled_unmounted_partition(self):
+    def test_selects_mounted_and_ordinary_unmounted_removable_partitions(self):
         data = {
             "blockdevices": [
                 {
@@ -49,7 +49,7 @@ class DestinationTest(unittest.TestCase):
                             "rm": False,
                             "ro": False,
                             "fstype": "ext4",
-                            "label": "MOONLIGHTOS_SUPPORT",
+                            "label": "ARCHIVE",
                             "mountpoints": [None],
                         },
                     ],
@@ -59,6 +59,11 @@ class DestinationTest(unittest.TestCase):
         found = support.destinations_from_lsblk(data, lambda path: path == "/media/files")
         self.assertEqual({item.device for item in found}, {"/dev/sdb1", "/dev/sdb2"})
         self.assertTrue(found[0].mounted)
+        unmounted = next(item for item in found if item.device == "/dev/sdb2")
+        self.assertFalse(unmounted.mounted)
+        self.assertEqual(unmounted.label, support.SUPPORT_MOUNT_LABEL)
+        self.assertEqual(unmounted.display_label, "ARCHIVE")
+        self.assertIn("WILL MOUNT TEMPORARILY", unmounted.display_name)
 
     def test_rejects_internal_nvme_and_sata(self):
         data = {
@@ -127,7 +132,7 @@ class DestinationTest(unittest.TestCase):
         }
         self.assertEqual(support.destinations_from_lsblk(data, lambda _path: True), [])
 
-    def test_boot_usb_persistence_is_allowed_when_mounted_writable(self):
+    def test_live_boot_usb_entire_tree_is_rejected(self):
         data = {
             "blockdevices": [
                 {
@@ -137,19 +142,26 @@ class DestinationTest(unittest.TestCase):
                     "rm": True,
                     "children": [
                         {
+                            "path": "/dev/sdd1",
+                            "type": "part",
+                            "ro": False,
+                            "fstype": "iso9660",
+                            "label": "MOONLIGHTOS",
+                            "mountpoints": ["/run/live/medium"],
+                        },
+                        {
                             "path": "/dev/sdd2",
                             "type": "part",
                             "ro": False,
                             "fstype": "ext4",
                             "label": "persistence",
                             "mountpoints": ["/run/live/persistence/sdd2"],
-                        }
+                        },
                     ],
                 }
             ]
         }
-        found = support.destinations_from_lsblk(data, lambda _path: True)
-        self.assertEqual(found[0].label, "persistence")
+        self.assertEqual(support.destinations_from_lsblk(data, lambda _path: True), [])
 
     def test_whole_disk_usb_filesystem_is_allowed(self):
         data = {
@@ -168,6 +180,26 @@ class DestinationTest(unittest.TestCase):
         }
         found = support.destinations_from_lsblk(data, lambda _path: True)
         self.assertEqual([item.device for item in found], ["/dev/sde"])
+
+    def test_unmounted_whole_disk_usb_filesystem_is_allowed(self):
+        data = {
+            "blockdevices": [
+                {
+                    "path": "/dev/sdf",
+                    "type": "disk",
+                    "tran": "usb",
+                    "rm": True,
+                    "ro": False,
+                    "fstype": "vfat",
+                    "label": "DIAGS",
+                    "mountpoints": [None],
+                }
+            ]
+        }
+        found = support.destinations_from_lsblk(data, lambda _path: False)
+        self.assertEqual([item.device for item in found], ["/dev/sdf"])
+        self.assertFalse(found[0].mounted)
+        self.assertEqual(found[0].display_label, "DIAGS")
 
     def test_unsafe_label_is_terminal_safe(self):
         self.assertEqual(support.safe_terminal_text("USB\x1b[2J\nBAD"), "USB??2J?BAD")

@@ -1,0 +1,19 @@
+[Unit]
+Description=MoonlightOS triple-Esc application escape guard
+After=moonlightos-launcher.service
+PartOf=moonlightos-launcher.service
+
+[Service]
+Type=simple
+User=moonlightos
+Group=moonlightos
+SupplementaryGroups=input
+Environment=XDG_RUNTIME_DIR=/run/moonlightos
+ExecStart=/usr/libexec/moonlightos-escape-guard
+Restart=on-failure
+RestartSec=2
+StandardOutput=append:/var/log/moonlightos/escape-guard.log
+StandardError=append:/var/log/moonlightos/escape-guard.log
+
+[Install]
+WantedBy=graphical.target

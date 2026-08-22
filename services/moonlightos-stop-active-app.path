@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for MoonlightOS active-app stop requests
+
+[Path]
+PathExists=/run/moonlightos/stop-active-app
+Unit=moonlightos-stop-active-app.service
+
+[Install]
+WantedBy=graphical.target

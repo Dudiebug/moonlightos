@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import curses
+import ipaddress
 import os
 import pathlib
 import subprocess
@@ -26,6 +27,11 @@ MENU = (
     ("REBOOT", "reboot"),
     ("SHUTDOWN", "poweroff"),
 )
+APP_LAUNCH = {
+    "moonlight": ("MOONLIGHT", "moonlight", "start-moonlight"),
+    "chiaki": ("CHIAKI-NG", "chiaki-ng", "start-chiaki"),
+    "firefox": ("FIREFOX", "firefox", "start-firefox"),
+}
 GAP_BEFORE = {4, 5}
 SETTINGS_MENU = (
     "RESOLUTION",
@@ -35,6 +41,7 @@ SETTINGS_MENU = (
     "SYSTEM DIAGNOSTICS",
     "BACK",
 )
+SPINNER = "|/-\\"
 
 
 def move_selection(selected: int, key: int, count: int) -> int:
@@ -46,21 +53,41 @@ def move_selection(selected: int, key: int, count: int) -> int:
 
 
 def get_ipv4(output: str) -> str:
+    """Return the first non-loopback IPv4 from normal or `ip -brief` output."""
     for line in output.splitlines():
         fields = line.split()
+        if not fields:
+            continue
+        candidates: list[str] = []
         if "inet" in fields:
-            value = fields[fields.index("inet") + 1]
-            return value.split("/", 1)[0]
+            index = fields.index("inet") + 1
+            if index < len(fields):
+                candidates.append(fields[index])
+        else:
+            # `ip -brief -4 address` prints: IFACE STATE ADDRESS/PREFIX ...
+            candidates.extend(fields[2:])
+        for candidate in candidates:
+            value = candidate.split("/", 1)[0]
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError:
+                continue
+            if isinstance(address, ipaddress.IPv4Address) and not address.is_loopback:
+                return str(address)
     return "NO IPV4"
 
 
 def network_summary() -> str:
-    result = subprocess.run(
-        ["ip", "-brief", "-4", "address", "show", "up"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["ip", "-brief", "-4", "address", "show", "up"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=3,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "NO IPV4  OFFLINE"
     address = get_ipv4(result.stdout)
     state = "ONLINE" if address != "NO IPV4" else "OFFLINE"
     return f"{address}  {state}"
@@ -78,6 +105,19 @@ def add_centered(screen: curses.window, row: int, text: str) -> None:
         pass
 
 
+def draw_border(screen: curses.window) -> None:
+    height, width = screen.getmaxyx()
+    if height < 8 or width < 24:
+        return
+    try:
+        screen.border(
+            ord("|"), ord("|"), ord("-"), ord("-"),
+            ord("+"), ord("+"), ord("+"), ord("+"),
+        )
+    except curses.error:
+        pass
+
+
 class Launcher:
     def __init__(self, screen: curses.window) -> None:
         self.screen = screen
@@ -87,12 +127,12 @@ class Launcher:
 
     def prepare_session(self) -> None:
         RUN.mkdir(mode=0o750, parents=True, exist_ok=True)
-        display = os.environ.get("DISPLAY", ":0")
+        display_name = os.environ.get("DISPLAY", ":0")
         wayland = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
-        if not display.startswith(":") or "/" in display or "/" in wayland:
+        if not display_name.startswith(":") or "/" in display_name or "/" in wayland:
             raise RuntimeError("Cage supplied an invalid display environment")
         (RUN / "session.env").write_text(
-            f"DISPLAY={display}\nWAYLAND_DISPLAY={wayland}\n", encoding="utf-8"
+            f"DISPLAY={display_name}\nWAYLAND_DISPLAY={wayland}\n", encoding="utf-8"
         )
         os.chmod(RUN / "session.env", 0o640)
 
@@ -102,15 +142,7 @@ class Launcher:
     def draw(self) -> None:
         self.screen.erase()
         height, width = self.screen.getmaxyx()
-        if height >= 8 and width >= 24:
-            try:
-                self.screen.border(
-                    ord("|"), ord("|"), ord("-"), ord("-"),
-                    ord("+"), ord("+"), ord("+"), ord("+"),
-                )
-            except curses.error:
-                pass
-
+        draw_border(self.screen)
         title_row = max(2, height // 8)
         add_centered(self.screen, title_row, "MOONLIGHTOS")
 
@@ -138,6 +170,118 @@ class Launcher:
         add_centered(self.screen, max(row + 2, height - 4), self.status)
         self.screen.refresh()
 
+    def draw_launching(self, label: str, frame: str) -> None:
+        self.screen.erase()
+        height, _width = self.screen.getmaxyx()
+        draw_border(self.screen)
+        add_centered(self.screen, max(2, height // 8), "MOONLIGHTOS")
+        center = max(6, height // 2 - 1)
+        add_centered(self.screen, center, f"STARTING {label}  {frame}")
+        add_centered(self.screen, center + 2, "PLEASE WAIT")
+        add_centered(self.screen, height - 3, "TRIPLE-TAP ESC IN AN APP TO RETURN")
+        self.screen.refresh()
+
+    def show_launch_failure(self, label: str, message: str) -> None:
+        self.screen.timeout(1000)
+        while True:
+            self.screen.erase()
+            height, width = self.screen.getmaxyx()
+            draw_border(self.screen)
+            add_centered(self.screen, max(2, height // 8), f"{label} FAILED TO START")
+            rows = textwrap.wrap(message, width=max(8, width - 8)) or ["UNKNOWN ERROR"]
+            first = max(6, height // 2 - len(rows) // 2)
+            for offset, row in enumerate(rows[: max(1, height - first - 5)]):
+                add_centered(self.screen, first + offset, row)
+            add_centered(self.screen, height - 3, "ENTER OR ESC RETURNS TO LAUNCHER")
+            self.screen.refresh()
+            if self.screen.getch() in (curses.KEY_ENTER, 10, 13, 27):
+                return
+
+    @staticmethod
+    def read_app_status(app_id: str) -> str:
+        path = RUN / f"{app_id}-status"
+        try:
+            if path.is_symlink() or path.stat().st_size > 512:
+                return ""
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            return ""
+        return lines[0][:240] if lines else ""
+
+    def launch_app(self, action: str) -> bool:
+        label, app_id, request = APP_LAUNCH[action]
+        ready = RUN / f"{app_id}-ready"
+        state = RUN / f"{app_id}-status"
+        ready.unlink(missing_ok=True)
+        state.unlink(missing_ok=True)
+        self.request(request)
+
+        deadline = time.monotonic() + 18
+        failure_since: float | None = None
+        frame = 0
+        self.screen.timeout(100)
+        try:
+            while time.monotonic() < deadline:
+                self.draw_launching(label, SPINNER[frame % len(SPINNER)])
+                frame += 1
+                if ready.exists():
+                    self.status = f"{label} STARTED"
+                    return True
+
+                app_state = self.read_app_status(app_id)
+                now = time.monotonic()
+                if app_state.startswith("failed:"):
+                    if failure_since is None:
+                        failure_since = now
+                    # App units retry after two seconds. A persistent failure for
+                    # longer than that means retries have not recovered startup.
+                    if now - failure_since >= 2.75:
+                        self.show_launch_failure(label, app_state.removeprefix("failed:").strip())
+                        self.status = f"{label} FAILED TO START"
+                        return False
+                else:
+                    failure_since = None
+                self.screen.getch()  # permits curses to process resize/input state
+        finally:
+            self.screen.timeout(1000)
+
+        last_state = self.read_app_status(app_id)
+        message = (
+            last_state.removeprefix("failed:").strip()
+            if last_state.startswith("failed:")
+            else "THE APPLICATION DID NOT BECOME READY BEFORE THE STARTUP TIMEOUT"
+        )
+        self.show_launch_failure(label, message)
+        self.status = f"{label} START TIMED OUT"
+        return False
+
+    def restore_curses(self) -> None:
+        try:
+            curses.reset_prog_mode()
+        except curses.error:
+            pass
+        for operation in (curses.noecho, curses.cbreak):
+            try:
+                operation()
+            except curses.error:
+                pass
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            pass
+        try:
+            curses.flushinp()
+        except curses.error:
+            pass
+        self.screen.keypad(True)
+        self.screen.timeout(1000)
+        try:
+            self.screen.clearok(True)
+        except curses.error:
+            pass
+        self.screen.clear()
+        self.screen.refresh()
+
     def terminal_command(self, command: list[str], wait_message: str | None = None) -> int:
         curses.def_prog_mode()
         curses.endwin()
@@ -149,21 +293,20 @@ class Launcher:
                 input()
             return result.returncode
         finally:
-            curses.reset_prog_mode()
-            self.screen.clear()
-            self.screen.refresh()
+            self.restore_curses()
 
     def activate(self) -> None:
         _label, action = MENU[self.selected]
-        if action == "moonlight":
-            self.request("start-moonlight")
-        elif action == "chiaki":
-            self.request("start-chiaki")
-        elif action == "firefox":
-            self.request("start-firefox")
+        if action in APP_LAUNCH:
+            self.launch_app(action)
         elif action == "tailscale":
             self.request("tailscale-enroll")
             self.terminal_command(["moonlightos-tailscale-enrollment"])
+            # Rebuild runtime state after the external terminal UI. This avoids
+            # the broken input/app-launch state seen after enrollment returns.
+            self.prepare_session()
+            self.status = network_summary()
+            self.last_status_update = time.monotonic()
         elif action == "settings":
             Settings(self.screen, self.terminal_command).run()
         elif action in {"reboot", "poweroff"}:

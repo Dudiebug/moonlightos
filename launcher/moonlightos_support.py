@@ -18,6 +18,8 @@ RUN = pathlib.Path("/run/moonlightos")
 REQUEST = RUN / "support-export.request"
 STATUS = RUN / "support-export.status"
 UNWRITABLE_FILESYSTEMS = {"", "iso9660", "squashfs", "udf"}
+SUPPORT_MOUNT_LABEL = "MOONLIGHTOS_SUPPORT"
+LIVE_MEDIUM = "/run/live/medium"
 
 
 @dataclass(frozen=True)
@@ -29,12 +31,16 @@ class Destination:
     mounted: bool
     majmin: str = ""
     uuid: str = ""
+    display_label: str = ""
 
     @property
     def display_name(self) -> str:
-        label = safe_terminal_text(self.label or pathlib.Path(self.device).name)
+        label = safe_terminal_text(
+            self.display_label or self.label or pathlib.Path(self.device).name
+        )
         location = safe_terminal_text(self.mountpoint or self.device)
-        return f"{label}  {location}"
+        suffix = "" if self.mounted else "  (WILL MOUNT TEMPORARILY)"
+        return f"{label}  {location}{suffix}"
 
 
 def safe_terminal_text(value: str, limit: int = 96) -> str:
@@ -54,12 +60,27 @@ def _mountpoints(value: object) -> list[str]:
     return []
 
 
+def _subtree_contains_live_medium(node: dict[str, object]) -> bool:
+    mountpoints = _mountpoints(node.get("mountpoints") or node.get("mountpoint"))
+    if LIVE_MEDIUM in mountpoints:
+        return True
+    return any(
+        _subtree_contains_live_medium(child)
+        for child in node.get("children") or []
+        if isinstance(child, dict)
+    )
+
+
 def destinations_from_lsblk(
     data: dict[str, object], writable: Callable[[str], bool]
 ) -> list[Destination]:
     found: list[Destination] = []
 
-    def walk(node: dict[str, object], parent_external: bool = False) -> None:
+    def walk(
+        node: dict[str, object],
+        parent_external: bool = False,
+        parent_is_live_disk: bool = False,
+    ) -> None:
         transport = str(node.get("tran") or "").lower()
         path = str(node.get("path") or "")
         removable = _bool(node.get("rm"))
@@ -68,6 +89,7 @@ def destinations_from_lsblk(
         if explicitly_internal:
             external = False
 
+        live_disk = parent_is_live_disk or _subtree_contains_live_medium(node)
         fstype = str(node.get("fstype") or "").lower()
         label = str(node.get("label") or "")
         read_only = _bool(node.get("ro"))
@@ -78,16 +100,49 @@ def destinations_from_lsblk(
         eligible_type = node_type in {"part", "crypt", "lvm"} or (
             node_type == "disk" and bool(fstype)
         )
-        if external and eligible_type and not read_only and fstype not in UNWRITABLE_FILESYSTEMS:
+
+        if (
+            external
+            and not live_disk
+            and eligible_type
+            and not read_only
+            and fstype not in UNWRITABLE_FILESYSTEMS
+            and path.startswith("/dev/")
+        ):
             for mountpoint in mountpoints:
-                if mountpoint != "/run/live/medium" and writable(mountpoint):
-                    found.append(Destination(path, mountpoint, label, fstype, True, majmin, uuid))
-            if not mountpoints and label == "MOONLIGHTOS_SUPPORT":
-                found.append(Destination(path, "", label, fstype, False, majmin, uuid))
+                if mountpoint != LIVE_MEDIUM and writable(mountpoint):
+                    found.append(
+                        Destination(
+                            path,
+                            mountpoint,
+                            label,
+                            fstype,
+                            True,
+                            majmin,
+                            uuid,
+                            label,
+                        )
+                    )
+            if not mountpoints:
+                # The privileged exporter already has a hardened temporary-mount
+                # path. Mark ordinary external filesystems with its internal
+                # authorization label while preserving the real label for UI.
+                found.append(
+                    Destination(
+                        path,
+                        "",
+                        SUPPORT_MOUNT_LABEL,
+                        fstype,
+                        False,
+                        majmin,
+                        uuid,
+                        label,
+                    )
+                )
 
         for child in node.get("children") or []:
             if isinstance(child, dict):
-                walk(child, external)
+                walk(child, external, live_disk)
 
     for device in data.get("blockdevices") or []:
         if isinstance(device, dict):
@@ -98,8 +153,8 @@ def destinations_from_lsblk(
         unique.values(),
         key=lambda item: (
             not item.mounted,
-            item.label != "MOONLIGHTOS_SUPPORT",
-            item.label != "persistence",
+            item.label != SUPPORT_MOUNT_LABEL,
+            item.display_label != "persistence",
             item.device,
             item.mountpoint,
         ),

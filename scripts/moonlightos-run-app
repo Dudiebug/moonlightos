@@ -29,21 +29,39 @@ case "$APP" in
     exit 64
     ;;
 esac
-rm -f -- "$request"
 
-[[ -x "$binary" ]] || { echo "Application executable is missing: $binary" >&2; exit 66; }
+ready=/run/moonlightos/$APP-ready
+status_file=/run/moonlightos/$APP-status
+active_file=/run/moonlightos/app-active
+rm -f -- "$request" "$ready" "$status_file"
+
+write_status() {
+  printf '%s\n' "$1" > "$status_file"
+}
+
+write_status starting
+if [[ ! -x "$binary" ]]; then
+  write_status "failed: application executable is missing"
+  echo "Application executable is missing: $binary" >&2
+  exit 66
+fi
+
 exec > >(tee -a "$LOG_DIR/$APP.log") 2>&1
 if [[ -n "$appdir" ]]; then
   export APPDIR="$appdir"
   export PATH="$appdir/usr/bin:$PATH"
   export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
-touch /run/moonlightos/app-active
-ready=/run/moonlightos/$APP-ready
-rm -f -- "$ready"
-cleanup() { rm -f -- /run/moonlightos/app-active "$ready"; }
+printf '%s\n' "$APP" > "$active_file"
+cleanup() {
+  if [[ -f "$active_file" ]] && [[ $(head -n 1 "$active_file" 2>/dev/null || true) == "$APP" ]]; then
+    rm -f -- "$active_file"
+  fi
+  rm -f -- "$ready"
+}
 trap cleanup EXIT INT TERM
 
+READY_REACHED=0
 run_client() {
   "$@" &
   local pid=$!
@@ -54,7 +72,9 @@ run_client() {
     fi
     sleep 0.1
   done
+  READY_REACHED=1
   touch "$ready"
+  write_status started
   echo "MOONLIGHTOS_APP_STARTED $APP"
   wait "$pid"
 }
@@ -97,6 +117,14 @@ else
   rc=$?
 fi
 set -e
+
+if ((READY_REACHED == 0)); then
+  write_status "failed: exited before the application became ready (status $rc)"
+elif ((rc == 0)); then
+  write_status "exited: status 0"
+else
+  write_status "exited: status $rc"
+fi
 
 if ((rc == 0)); then
   printf '%s %s exited normally; returning to launcher\n' "$(date --iso-8601=seconds)" "$APP"

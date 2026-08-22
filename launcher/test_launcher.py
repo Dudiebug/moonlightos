@@ -1,6 +1,5 @@
 import importlib.util
 import pathlib
-import tempfile
 import unittest
 from unittest import mock
 
@@ -14,9 +13,22 @@ class LauncherHelpersTest(unittest.TestCase):
         spec.loader.exec_module(cls.module)
         cls.get_ipv4 = staticmethod(cls.module.get_ipv4)
 
-    def test_ipv4_extracts_first_address(self):
+    def test_ipv4_extracts_first_address_from_legacy_output(self):
         sample = "2: eno1    inet 192.0.2.12/24 brd 192.0.2.255 scope global\n"
         self.assertEqual(self.get_ipv4(sample), "192.0.2.12")
+
+    def test_ipv4_extracts_brief_address_and_ignores_loopback(self):
+        sample = (
+            "lo               UNKNOWN        127.0.0.1/8\n"
+            "enp2s0           UP             192.168.50.27/24\n"
+        )
+        self.assertEqual(self.get_ipv4(sample), "192.168.50.27")
+
+    def test_ipv4_loopback_only_is_offline(self):
+        self.assertEqual(
+            self.get_ipv4("lo               UNKNOWN        127.0.0.1/8\n"),
+            "NO IPV4",
+        )
 
     def test_ipv4_absent(self):
         self.assertEqual(self.get_ipv4(""), "NO IPV4")
@@ -36,14 +48,28 @@ class LauncherHelpersTest(unittest.TestCase):
             ],
         )
 
-    def test_firefox_menu_requests_service(self):
-        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
-            self.module, "RUN", pathlib.Path(directory)
-        ):
-            launcher = object.__new__(self.module.Launcher)
-            launcher.selected = 2
+    def test_firefox_menu_uses_launch_feedback_path(self):
+        launcher = object.__new__(self.module.Launcher)
+        launcher.selected = 2
+        launcher.launch_app = mock.Mock(return_value=True)
+        launcher.activate()
+        launcher.launch_app.assert_called_once_with("firefox")
+
+    def test_tailscale_return_restores_launcher_runtime_state(self):
+        launcher = object.__new__(self.module.Launcher)
+        launcher.selected = 3
+        launcher.request = mock.Mock()
+        launcher.terminal_command = mock.Mock(return_value=0)
+        launcher.prepare_session = mock.Mock()
+        with mock.patch.object(
+            self.module, "network_summary", return_value="192.0.2.25  ONLINE"
+        ), mock.patch.object(self.module.time, "monotonic", return_value=55.0):
             launcher.activate()
-            self.assertTrue((pathlib.Path(directory) / "start-firefox").exists())
+        launcher.request.assert_called_once_with("tailscale-enroll")
+        launcher.terminal_command.assert_called_once_with(["moonlightos-tailscale-enrollment"])
+        launcher.prepare_session.assert_called_once_with()
+        self.assertEqual(launcher.status, "192.0.2.25  ONLINE")
+        self.assertEqual(launcher.last_status_update, 55.0)
 
     def test_settings_menu_and_keyboard_navigation(self):
         self.assertEqual(
