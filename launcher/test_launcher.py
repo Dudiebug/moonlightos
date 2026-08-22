@@ -95,6 +95,114 @@ class LauncherHelpersTest(unittest.TestCase):
             launcher.activate()
             run.assert_called_once_with()
 
+    def test_support_progress_bar_is_fixed_width_and_moves(self):
+        first = self.module.indeterminate_progress_bar(24, 0)
+        later = self.module.indeterminate_progress_bar(24, 5)
+        self.assertEqual(len(first), 24)
+        self.assertEqual(len(later), 24)
+        self.assertTrue(first.startswith("[") and first.endswith("]"))
+        self.assertEqual(first.count("="), later.count("="))
+        self.assertNotEqual(first, later)
+
+    def test_support_elapsed_time_format(self):
+        self.assertEqual(self.module.format_elapsed(0), "00:00")
+        self.assertEqual(self.module.format_elapsed(65.9), "01:05")
+
+    def support_destination(self):
+        return self.module.support.Destination(
+            "/dev/sdb1", "/media/usb", "SUPPORT", "vfat", True
+        )
+
+    def support_settings(self):
+        screen = mock.Mock()
+        screen.getmaxyx.return_value = (24, 80)
+        settings = self.module.Settings(screen, mock.Mock())
+        settings.draw_support_progress = mock.Mock()
+        settings.show_message = mock.Mock()
+        return settings, screen
+
+    def test_support_export_success_is_reported(self):
+        settings, screen = self.support_settings()
+        destination = self.support_destination()
+        with mock.patch.object(
+            self.module.support, "discover_destinations", return_value=[destination]
+        ), mock.patch.object(
+            self.module.support, "submit_request", return_value="request-id"
+        ), mock.patch.object(
+            self.module.support,
+            "read_status",
+            return_value={
+                "request_id": "request-id",
+                "state": "success",
+                "message": "Support file created",
+                "destination": "/media/usb/support.tar.gz",
+            },
+        ), mock.patch.object(
+            self.module.time, "monotonic", side_effect=[100.0, 100.1]
+        ):
+            settings.generate_support_file()
+        settings.show_message.assert_called_once_with(
+            "SUPPORT FILE CREATED", "SAVED: /media/usb/support.tar.gz"
+        )
+        self.assertEqual(settings.status, "SAVED: /media/usb/support.tar.gz")
+        self.assertIn(mock.call(1000), screen.timeout.call_args_list)
+
+    def test_support_export_worker_failure_is_reported(self):
+        settings, _screen = self.support_settings()
+        destination = self.support_destination()
+        with mock.patch.object(
+            self.module.support, "discover_destinations", return_value=[destination]
+        ), mock.patch.object(
+            self.module.support, "submit_request", return_value="request-id"
+        ), mock.patch.object(
+            self.module.support,
+            "read_status",
+            return_value={
+                "request_id": "request-id",
+                "state": "failed",
+                "message": "destination disappeared",
+                "destination": "",
+            },
+        ), mock.patch.object(
+            self.module.time, "monotonic", side_effect=[100.0, 100.1]
+        ):
+            settings.generate_support_file()
+        settings.show_message.assert_called_once_with(
+            "SUPPORT EXPORT FAILED", "destination disappeared"
+        )
+        self.assertEqual(settings.status, "EXPORT FAILED: destination disappeared")
+
+    def test_support_export_missing_service_is_reported(self):
+        settings, _screen = self.support_settings()
+        destination = self.support_destination()
+        with mock.patch.object(
+            self.module.support, "discover_destinations", return_value=[destination]
+        ), mock.patch.object(
+            self.module.support, "submit_request", return_value="request-id"
+        ), mock.patch.object(
+            self.module.support, "read_status", return_value=None
+        ), mock.patch.object(
+            self.module, "SUPPORT_EXPORT_START_TIMEOUT", 0.0
+        ), mock.patch.object(
+            self.module.time, "monotonic", side_effect=[100.0, 100.0]
+        ):
+            settings.generate_support_file()
+        title, failure = settings.show_message.call_args.args
+        self.assertEqual(title, "SUPPORT EXPORT FAILED")
+        self.assertIn("DID NOT REPORT STARTUP", failure)
+        self.assertEqual(settings.status, "EXPORT FAILED: SERVICE DID NOT START")
+
+    def test_support_export_missing_usb_is_reported(self):
+        settings, _screen = self.support_settings()
+        with mock.patch.object(
+            self.module.support, "discover_destinations", return_value=[]
+        ):
+            settings.generate_support_file()
+        settings.show_message.assert_called_once_with(
+            "USB DRIVE NOT FOUND", "CONNECT A WRITABLE REMOVABLE USB DRIVE AND TRY AGAIN"
+        )
+        self.assertEqual(settings.status, "SUPPORT EXPORT FAILED: NO WRITABLE USB DRIVE")
+
     def display_fixture(self):
         mode_type = self.module.display.Mode
         output_type = self.module.display.Output
