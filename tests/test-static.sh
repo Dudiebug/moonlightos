@@ -27,11 +27,11 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.3 ]]
+[[ "$(< VERSION)" == 0.1.4 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.3-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.4-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
 rg -q '^  actions: read$' .github/workflows/release-v1.1.yml
-rg -q 'git/matching-refs/tags/v0\.1\.3' .github/workflows/release-v1.1.yml
+rg -q 'git/matching-refs/tags/v0\.1\.4' .github/workflows/release-v1.1.yml
 ! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v1.1.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
