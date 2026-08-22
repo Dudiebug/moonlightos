@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-ISO := build/out/moonlightos-0.1.2-amd64.iso
+ISO := build/out/moonlightos-0.1.3-amd64.iso
 
 .PHONY: help fetch-apps configure build checksum test qemu-smoke clean
 
