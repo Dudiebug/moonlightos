@@ -42,6 +42,9 @@ SETTINGS_MENU = (
     "BACK",
 )
 SPINNER = "|/-\\"
+SUPPORT_EXPORT_TIMEOUT = 180.0
+SUPPORT_EXPORT_START_TIMEOUT = 12.0
+SUPPORT_EXPORT_POLL_MS = 100
 
 
 def move_selection(selected: int, key: int, count: int) -> int:
@@ -50,6 +53,31 @@ def move_selection(selected: int, key: int, count: int) -> int:
     if key in (curses.KEY_DOWN, ord("j")):
         return (selected + 1) % count
     return selected
+
+
+def indeterminate_progress_bar(width: int, frame: int) -> str:
+    """Return a fixed-width, bouncing ASCII progress indicator."""
+    width = max(8, width)
+    inner_width = width - 2
+    segment_width = max(2, min(8, inner_width // 4))
+    travel = max(0, inner_width - segment_width)
+    if travel:
+        cycle = frame % (travel * 2)
+        position = cycle if cycle <= travel else travel * 2 - cycle
+    else:
+        position = 0
+    body = (
+        " " * position
+        + "=" * segment_width
+        + " " * (inner_width - position - segment_width)
+    )
+    return f"[{body}]"
+
+
+def format_elapsed(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, remaining = divmod(total, 60)
+    return f"{minutes:02d}:{remaining:02d}"
 
 
 def get_ipv4(output: str) -> str:
@@ -441,6 +469,50 @@ class Settings:
             if self.screen.getch() in (curses.KEY_ENTER, 10, 13, 27):
                 return
 
+    def draw_support_progress(
+        self,
+        destination: support.Destination,
+        frame: int,
+        message: str,
+        elapsed: float,
+    ) -> None:
+        self.screen.erase()
+        height, width = self.screen.getmaxyx()
+        draw_border(self.screen)
+        title_row = max(2, height // 8)
+        add_centered(self.screen, title_row, "EXPORTING SUPPORT FILE")
+
+        stage_rows = textwrap.wrap(
+            (message or "COLLECTING SUPPORT INFORMATION").upper(),
+            width=max(8, width - 8),
+        )[:2]
+        stage_row = max(title_row + 3, height // 2 - 4)
+        spinner = SPINNER[frame % len(SPINNER)]
+        for index, row in enumerate(stage_rows):
+            prefix = f"{spinner}  " if index == 0 else ""
+            add_centered(self.screen, stage_row + index, prefix + row)
+
+        bar_width = min(50, max(8, width - 12))
+        add_centered(
+            self.screen,
+            stage_row + len(stage_rows) + 1,
+            indeterminate_progress_bar(bar_width, frame),
+        )
+
+        destination_rows = textwrap.wrap(
+            f"USB: {destination.display_name}", width=max(8, width - 8)
+        )[:2]
+        destination_row = stage_row + len(stage_rows) + 3
+        for index, row in enumerate(destination_rows):
+            add_centered(self.screen, destination_row + index, row)
+        add_centered(
+            self.screen,
+            destination_row + len(destination_rows) + 1,
+            f"ELAPSED {format_elapsed(elapsed)}",
+        )
+        add_centered(self.screen, height - 3, "PLEASE WAIT - DO NOT REMOVE USB DRIVE")
+        self.screen.refresh()
+
     def rollback(self, old_output: display.Output, old_mode: display.Mode) -> None:
         try:
             validated = display.valid_output_mode(old_output.name, old_output.identity, old_mode)
@@ -522,9 +594,17 @@ class Settings:
             self.rollback(old_output, old_mode)
 
     def generate_support_file(self) -> None:
-        destinations = support.discover_destinations()
+        try:
+            destinations = support.discover_destinations()
+        except (OSError, subprocess.SubprocessError) as error:
+            failure = f"USB DESTINATION CHECK FAILED: {error}"
+            self.show_message("SUPPORT EXPORT FAILED", failure)
+            self.status = failure
+            return
         if not destinations:
-            self.status = "A WRITABLE REMOVABLE USB PARTITION IS REQUIRED"
+            failure = "CONNECT A WRITABLE REMOVABLE USB DRIVE AND TRY AGAIN"
+            self.show_message("USB DRIVE NOT FOUND", failure)
+            self.status = "SUPPORT EXPORT FAILED: NO WRITABLE USB DRIVE"
             return
         destination = destinations[0]
         if len(destinations) > 1:
@@ -540,31 +620,63 @@ class Settings:
         try:
             request_id = support.submit_request(destination)
         except OSError as error:
-            self.status = f"SUPPORT REQUEST FAILED: {error}"
+            failure = f"COULD NOT START THE SUPPORT EXPORT: {error}"
+            self.show_message("SUPPORT EXPORT FAILED", failure)
+            self.status = f"EXPORT FAILED: {error}"
             return
-        deadline = time.monotonic() + 180
-        self.screen.timeout(250)
+
+        started_at = time.monotonic()
+        start_deadline = started_at + SUPPORT_EXPORT_START_TIMEOUT
+        deadline = started_at + SUPPORT_EXPORT_TIMEOUT
+        frame = 0
+        message = "WAITING FOR EXPORT SERVICE"
+        self.screen.timeout(SUPPORT_EXPORT_POLL_MS)
         try:
-            while time.monotonic() < deadline:
-                self.status = "COLLECTING SUPPORT FILE... ESC RETURNS TO SETTINGS"
-                self.draw()
+            while True:
+                now = time.monotonic()
                 state = support.read_status(request_id)
-                if state and state.get("state") == "success":
-                    destination_name = state.get("destination", "")
-                    self.show_message("SUPPORT FILE CREATED", f"SAVED: {destination_name}")
-                    self.status = f"SAVED: {destination_name}"
-                    return
-                if state and state.get("state") == "failed":
-                    failure = state.get("message", "")
+                if state:
+                    export_state = state.get("state", "")
+                    if export_state == "success":
+                        destination_name = state.get("destination", "") or destination.display_name
+                        self.screen.timeout(1000)
+                        self.show_message("SUPPORT FILE CREATED", f"SAVED: {destination_name}")
+                        self.status = f"SAVED: {destination_name}"
+                        return
+                    if export_state == "failed":
+                        failure = state.get("message", "") or "THE EXPORTER REPORTED AN UNKNOWN FAILURE"
+                        self.screen.timeout(1000)
+                        self.show_message("SUPPORT EXPORT FAILED", failure)
+                        self.status = f"EXPORT FAILED: {failure}"
+                        return
+                    if export_state == "working":
+                        message = state.get("message", "") or "COLLECTING SUPPORT INFORMATION"
+                elif now >= start_deadline:
+                    failure = (
+                        "THE EXPORT SERVICE DID NOT REPORT STARTUP. THE FILE WAS NOT CREATED. "
+                        "REBOOT MOONLIGHTOS AND TRY AGAIN; IF IT FAILS AGAIN, RUN SYSTEM DIAGNOSTICS."
+                    )
+                    self.screen.timeout(1000)
                     self.show_message("SUPPORT EXPORT FAILED", failure)
-                    self.status = f"EXPORT FAILED: {failure}"
+                    self.status = "EXPORT FAILED: SERVICE DID NOT START"
                     return
-                if self.screen.getch() == 27:
-                    self.status = "SUPPORT EXPORT CONTINUES IN THE BACKGROUND"
+
+                if now >= deadline:
+                    failure = (
+                        "THE EXPORT DID NOT REPORT COMPLETION WITHIN 3 MINUTES. "
+                        "DO NOT REMOVE THE USB DRIVE WHILE ITS ACTIVITY LIGHT IS FLASHING. "
+                        "REBOOT MOONLIGHTOS BEFORE TRYING AGAIN."
+                    )
+                    self.screen.timeout(1000)
+                    self.show_message("SUPPORT EXPORT TIMED OUT", failure)
+                    self.status = "SUPPORT EXPORT TIMED OUT"
                     return
+
+                self.draw_support_progress(destination, frame, message, now - started_at)
+                frame += 1
+                self.screen.getch()  # process resize/input state; export cannot be cancelled safely
         finally:
             self.screen.timeout(1000)
-        self.status = "SUPPORT EXPORT TIMED OUT; CHECK SERVICE STATUS"
 
     def activate(self) -> bool:
         if self.selected == 0:
