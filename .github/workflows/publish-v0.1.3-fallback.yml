@@ -1,0 +1,63 @@
+name: publish-v0.1.3-fallback
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: github.head_ref == 'release/v0.1.3-publish'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out merged release commit
+        uses: actions/checkout@v5
+        with:
+          ref: 9e8acc7767df852e6da28878c61273a7c24d18a3
+
+      - name: Verify release source
+        run: |
+          test "$(git rev-parse HEAD)" = 9e8acc7767df852e6da28878c61273a7c24d18a3
+          test "$(< VERSION)" = 0.1.3
+          test "$(git rev-parse HEAD^{tree})" = 28ce59080b033c15070dce63c80492e224bab2d6
+
+      - name: Download boot-tested v0.1.3 ISO
+        uses: actions/download-artifact@v8
+        with:
+          name: moonlightos-0.1.3-amd64
+          path: dist
+          repository: Dudiebug/moonlightos
+          run-id: 32547590127
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify ISO checksum
+        working-directory: dist
+        run: sha256sum --check --strict moonlightos-0.1.3-amd64.iso.sha256
+
+      - name: Publish v0.1.3 if still absent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: 9e8acc7767df852e6da28878c61273a7c24d18a3
+        run: |
+          if gh release view v0.1.3 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'v0.1.3 is already published; fallback has nothing to do.'
+            exit 0
+          fi
+          tagged_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v0.1.3" \
+            --jq '.[] | select(.ref == "refs/tags/v0.1.3") | .object.sha')
+          if [[ -n "$tagged_sha" && "$tagged_sha" != "$RELEASE_SHA" ]]; then
+            echo "Refusing to publish: v0.1.3 points to unexpected commit $tagged_sha" >&2
+            exit 1
+          fi
+          gh release create v0.1.3 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --title "MoonlightOS v0.1.3" \
+            --notes-file docs/releases/v0.1.3.md \
+            --latest \
+            dist/moonlightos-0.1.3-amd64.iso \
+            dist/moonlightos-0.1.3-amd64.iso.sha256
