@@ -1,11 +1,22 @@
 import importlib.util
 import pathlib
+import sys
+import types
 import unittest
+
+
+class Codes:
+    EV_KEY = 1
+    KEY_ESC = 1
 
 
 class EscapeGuardTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        fake = types.ModuleType("evdev")
+        fake.InputDevice = object
+        fake.ecodes = Codes
+        sys.modules["evdev"] = fake
         path = pathlib.Path(__file__).with_name("escape-guard.py")
         spec = importlib.util.spec_from_file_location("escape_guard", path)
         cls.module = importlib.util.module_from_spec(spec)
