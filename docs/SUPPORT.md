@@ -53,8 +53,9 @@ still be safely ejected or unmounted before removal.
 ## Privacy boundary
 
 The exporter omits browser/application profiles, pairing and registration
-state, `/var/lib/moonlightos/home`, and `/var/lib/tailscale`. Its systemd unit
-also makes both private-state directories inaccessible. Structured and plain
+state, `/var/lib/moonlightos/home`, `/var/lib/tailscale`, and BlueZ link-key
+storage under `/var/lib/bluetooth`. Its systemd unit also makes these
+private-state directories inaccessible. Structured and plain
 text redaction removes private keys, credentials, passwords, cookies, bearer
 tokens, auth/API tokens, Tailscale keys, and Tailscale enrollment URLs. LAN IP
 addresses and hardware/service failures remain because they are needed for

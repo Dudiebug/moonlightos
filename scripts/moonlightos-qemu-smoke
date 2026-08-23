@@ -33,6 +33,47 @@ systemctl is-active --quiet moonlightos-usbipd.service || {
   echo 'USB/IP daemon did not become active during QEMU smoke test.' >&2
   exit 1
 }
+
+wait_for_bluetooth_service() {
+  for _ in $(seq 1 100); do
+    if systemctl is-active --quiet moonlightos-bluetooth.service && \
+      /usr/libexec/moonlightos-bluetoothd --snapshot \
+        > /tmp/moonlightos-bluetooth-smoke.txt 2>&1; then
+      cat /tmp/moonlightos-bluetooth-smoke.txt
+      return 0
+    fi
+    sleep 0.1
+  done
+  systemctl --no-pager --full status moonlightos-bluetooth.service >&2 || true
+  cat /tmp/moonlightos-bluetooth-smoke.txt >&2 || true
+  echo 'Bluetooth control service did not become ready without an adapter.' >&2
+  return 1
+}
+wait_for_bluetooth_service
+launcher_pid=$(systemctl show --property=MainPID --value moonlightos-launcher.service)
+launcher_restarts=$(systemctl show --property=NRestarts --value moonlightos-launcher.service)
+audio_pid=$(systemctl show --property=MainPID --value moonlightos-audio.service)
+audio_restarts=$(systemctl show --property=NRestarts --value moonlightos-audio.service)
+systemctl restart bluetooth.service
+systemctl restart moonlightos-bluetooth.service
+wait_for_bluetooth_service
+test "$launcher_pid" = "$(systemctl show --property=MainPID --value moonlightos-launcher.service)"
+test "$launcher_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-launcher.service)"
+test "$audio_pid" = "$(systemctl show --property=MainPID --value moonlightos-audio.service)"
+test "$audio_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-audio.service)"
+runuser -u moonlightos -- env XDG_RUNTIME_DIR=/run/moonlightos \
+  PIPEWIRE_RUNTIME_DIR=/run/moonlightos \
+  wpctl status > /tmp/moonlightos-audio-smoke.txt 2>&1 || {
+  systemctl --no-pager --full status moonlightos-audio.service >&2 || true
+  find /run/moonlightos -maxdepth 1 -ls >&2 || true
+  find /run -type s -name 'pipewire-*' -ls >&2 || true
+  cat /var/log/moonlightos/audio.log >&2 || true
+  cat /tmp/moonlightos-audio-smoke.txt >&2 || true
+  echo 'PipeWire did not remain ready after Bluetooth service restarts.' >&2
+  exit 1
+}
+echo MOONLIGHTOS_SMOKE_BLUETOOTH_READY
+
 systemctl start --no-block moonlightos-moonlight.service
 wait_for_file /run/moonlightos/moonlight-ready Moonlight
 systemctl stop moonlightos-moonlight.service

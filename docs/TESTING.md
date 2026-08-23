@@ -12,7 +12,9 @@ fake-sysfs USB allowlist case. Focused tests also cover display-mode parsing,
 valid resolution/refresh pairs, missing connectors/modes, changed display
 identity, malformed configuration preservation, Settings navigation, controller
 mapping, support redaction, removable-media policy, safe archive streaming,
-atomic copy, checked unmount ordering, and failed-copy cleanup. They do not require a tailnet.
+atomic copy, checked unmount ordering, failed-copy cleanup, Bluetooth protocol
+validation, BlueZ object parsing, pairing-agent callbacks, and Bluetooth UI
+recovery. They do not require a tailnet or Bluetooth adapter.
 
 ## QEMU ISO smoke test
 
@@ -21,10 +23,11 @@ sudo apt install qemu-system-x86 ovmf
 make qemu-smoke
 ```
 
-The script boots `build/out/moonlightos-0.1.5-amd64.iso` with serial
+The script boots `build/out/moonlightos-0.1.6-amd64.iso` with serial
 output, a virtual Ethernet NIC, and UEFI when OVMF is available. Success means
 the boot reached the MoonlightOS launcher service marker. QEMU does not prove
-Intel VA-API, display audio, gamepad, USB/IP hardware, or streaming.
+Intel VA-API, physical Bluetooth behavior, display audio, gamepad, USB/IP
+hardware, or streaming.
 
 The test boots through UEFI rather than injecting the kernel directly. It must
 reach the launcher marker without depending on DHCP. GRUB also mirrors output
@@ -42,7 +45,11 @@ Success requires `MOONLIGHTOS_LAUNCHER_READY`, emitted only after foot presents
 the full-screen curses launcher. A QEMU-only firmware flag then starts the three
 production application services and requires `MOONLIGHTOS_APP_STARTED moonlight`,
 `MOONLIGHTOS_APP_STARTED chiaki-ng`, and `MOONLIGHTOS_APP_STARTED firefox`
-after each real application remains alive for five seconds. Launcher output is
+after each real application remains alive for five seconds. It also proves the
+Bluetooth control service handles an absent adapter and survives restarts of
+BlueZ and its own service without changing the launcher or audio-session PID
+and restart counts.
+Launcher output is
 mirrored to the boot console and remains available in
 `/var/log/moonlightos/launcher.log`.
 
@@ -55,7 +62,7 @@ and complete Debian Installer manually:
 qemu-img create -f qcow2 build/out/moonlightos-install-test.qcow2 24G
 qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom build/out/moonlightos-0.1.5-amd64.iso \
+  -cdrom build/out/moonlightos-0.1.6-amd64.iso \
   -drive file=build/out/moonlightos-install-test.qcow2,if=virtio \
   -device virtio-vga -display gtk \
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0
@@ -100,6 +107,33 @@ Support export:
 - [ ] Confirm the ISO9660 boot filesystem is not offered
 - [ ] Attach two writable removable targets and use the controller selector
 - [ ] Confirm the internal NVMe is never offered, without writing test data to it
+
+Bluetooth (record every unperformed item as untested):
+
+- [ ] Detect the Bluetooth adapter and turn Bluetooth off/on
+- [ ] Scan, cancel scanning, and confirm discovery stops
+- [ ] Pair an Xbox Wireless Controller, if available
+- [ ] Pair a DualSense controller, if available
+- [ ] Pair a Switch Pro Controller, if available
+- [ ] Pair a second controller while the first continues navigating the launcher
+- [ ] Pair a Bluetooth keyboard
+- [ ] Complete numeric-confirmation and PIN/passkey pairing
+- [ ] Pair Bluetooth headphones or a speaker and select its audio sink
+- [ ] Confirm HDMI/DP audio remains selectable
+- [ ] Disconnect, reconnect, forget, and re-pair a device
+- [ ] Reboot and confirm pairing state and automatic reconnection survive
+- [ ] Confirm Bluetooth audio reconnects without forcibly becoming the default
+- [ ] Restart `bluetooth.service` and `moonlightos-bluetooth.service`
+- [ ] Unplug the adapter while scanning, reinsert it, and recover
+- [ ] Unplug the adapter while pairing, reinsert it, and recover
+- [ ] Confirm the launcher PID and restart count do not change
+- [ ] Launch and exit Moonlight after Bluetooth configuration
+- [ ] Launch and exit chiaki-ng after Bluetooth configuration
+- [ ] Launch and exit Firefox after Bluetooth configuration
+
+Installed systems retain BlueZ state under `/var/lib/bluetooth`. Live USB
+persistence must include that directory for pairings to survive reboot. Never
+copy its contents into a support archive because it contains link keys.
 
 ## Opt-in live Tailscale checklist
 

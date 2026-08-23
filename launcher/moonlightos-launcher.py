@@ -15,6 +15,7 @@ import time
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import moonlightos_display as display
 import moonlightos_support as support
+import moonlightos_bluetooth as bluetooth
 
 
 RUN = pathlib.Path("/run/moonlightos")
@@ -34,6 +35,7 @@ APP_LAUNCH = {
 }
 GAP_BEFORE = {4, 5}
 SETTINGS_MENU = (
+    "BLUETOOTH",
     "RESOLUTION",
     "REFRESH RATE",
     "APPLY DISPLAY MODE",
@@ -442,6 +444,7 @@ class Settings:
             refresh = f"{self.refresh_mhz / 1000:g} HZ" if self.refresh_mhz else "UNAVAILABLE"
             resolution = self.resolution or "UNAVAILABLE"
             rows = [
+                "BLUETOOTH",
                 f"RESOLUTION                 {resolution}",
                 f"REFRESH RATE               {refresh}",
                 "APPLY DISPLAY MODE",
@@ -701,6 +704,8 @@ class Settings:
 
     def activate(self) -> bool:
         if self.selected == 0:
+            bluetooth.run_bluetooth(self.screen)
+        elif self.selected == 1:
             resolutions = self.resolutions()
             chosen = self.choose("RESOLUTION", [(item, item) for item in resolutions], self.resolution)
             if isinstance(chosen, str):
@@ -708,7 +713,7 @@ class Settings:
                 rates = self.refresh_rates()
                 if self.refresh_mhz not in rates and rates:
                     self.refresh_mhz = rates[0]
-        elif self.selected == 1:
+        elif self.selected == 2:
             rates = self.refresh_rates()
             choices = [
                 (f"{value / 1000:g} HZ", value)
@@ -717,11 +722,11 @@ class Settings:
             chosen = self.choose("REFRESH RATE", choices, self.refresh_mhz)
             if isinstance(chosen, int):
                 self.refresh_mhz = chosen
-        elif self.selected == 2:
-            self.apply_preview()
         elif self.selected == 3:
-            self.generate_support_file()
+            self.apply_preview()
         elif self.selected == 4:
+            self.generate_support_file()
+        elif self.selected == 5:
             self.terminal_command(
                 ["moonlightos-diagnostics"], "Press ENTER to return to Settings."
             )

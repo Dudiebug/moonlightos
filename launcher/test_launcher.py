@@ -116,6 +116,7 @@ class LauncherHelpersTest(unittest.TestCase):
         self.assertEqual(
             self.module.SETTINGS_MENU,
             (
+                "BLUETOOTH",
                 "RESOLUTION",
                 "REFRESH RATE",
                 "APPLY DISPLAY MODE",
@@ -124,8 +125,17 @@ class LauncherHelpersTest(unittest.TestCase):
                 "BACK",
             ),
         )
-        self.assertEqual(self.module.move_selection(0, self.module.curses.KEY_DOWN, 6), 1)
-        self.assertEqual(self.module.move_selection(0, self.module.curses.KEY_UP, 6), 5)
+        self.assertEqual(self.module.move_selection(0, self.module.curses.KEY_DOWN, 7), 1)
+        self.assertEqual(self.module.move_selection(0, self.module.curses.KEY_UP, 7), 6)
+
+    def test_bluetooth_settings_stays_in_launcher_screen(self):
+        screen = mock.Mock()
+        settings = self.module.Settings(screen, mock.Mock())
+        settings.selected = 0
+        with mock.patch.object(self.module.bluetooth, "run_bluetooth") as run:
+            self.assertTrue(settings.activate())
+        run.assert_called_once_with(screen)
+        settings.terminal_command.assert_not_called()
 
     def test_settings_entry_opens_curses_screen(self):
         launcher = object.__new__(self.module.Launcher)

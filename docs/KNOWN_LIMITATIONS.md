@@ -8,7 +8,11 @@
   Debian packages remain a future goal.
 - 4K60 SDR is best effort. HDR is unverified and unsupported for acceptance.
 - The installed root filesystem is writable; A/B read-only updates are deferred.
-- Wi-Fi and Bluetooth configuration are outside v0.1.2.
+- Bluetooth depends on kernel and firmware support for the installed adapter.
+  QEMU verifies only clean no-adapter behavior; no physical Bluetooth result is
+  claimed. MoonlightOS provides no desktop Bluetooth application.
+- Installed systems retain BlueZ pairing state normally. A live-persistent USB
+  must persist `/var/lib/bluetooth` separately for pairings to survive reboot.
 - Tailscale is installed but unauthenticated and optional. No subnet router,
   exit node, Serve, Funnel, public ingress, route acceptance, or advertised
   route is configured.
