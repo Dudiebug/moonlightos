@@ -69,6 +69,7 @@ systemctl enable moonlightos-reboot.path moonlightos-poweroff.path
 systemctl enable moonlightos-support-export.path
 systemctl enable moonlightos-audio.service moonlightos-launcher.service \
   moonlightos-gamepad-nav.service
+systemctl enable bluetooth.service moonlightos-bluetooth.service
 systemctl enable moonlightos-qemu-smoke.service
 systemctl enable tailscaled.service moonlightos-tailscale-enroll.path moonlightos-tailscale-ssh.path
 

@@ -1,8 +1,8 @@
 [Unit]
 Description=MoonlightOS controller-friendly launcher
 Requires=seatd.service
-Wants=moonlightos-audio.service
-After=seatd.service moonlightos-audio.service systemd-user-sessions.service
+Wants=moonlightos-audio.service moonlightos-bluetooth.service
+After=seatd.service moonlightos-audio.service moonlightos-bluetooth.service systemd-user-sessions.service
 Conflicts=getty@tty1.service
 StartLimitIntervalSec=60
 StartLimitBurst=5

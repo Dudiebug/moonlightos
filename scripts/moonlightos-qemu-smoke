@@ -33,6 +33,30 @@ systemctl is-active --quiet moonlightos-usbipd.service || {
   echo 'USB/IP daemon did not become active during QEMU smoke test.' >&2
   exit 1
 }
+
+for _ in $(seq 1 100); do
+  systemctl is-active --quiet moonlightos-bluetooth.service && break
+  sleep 0.1
+done
+systemctl is-active --quiet moonlightos-bluetooth.service || {
+  systemctl --no-pager --full status moonlightos-bluetooth.service >&2 || true
+  echo 'Bluetooth control service did not become active without an adapter.' >&2
+  exit 1
+}
+/usr/libexec/moonlightos-bluetoothd --snapshot
+launcher_pid=$(systemctl show --property=MainPID --value moonlightos-launcher.service)
+launcher_restarts=$(systemctl show --property=NRestarts --value moonlightos-launcher.service)
+systemctl restart bluetooth.service
+systemctl restart moonlightos-bluetooth.service
+for _ in $(seq 1 100); do
+  systemctl is-active --quiet moonlightos-bluetooth.service && break
+  sleep 0.1
+done
+/usr/libexec/moonlightos-bluetoothd --snapshot
+test "$launcher_pid" = "$(systemctl show --property=MainPID --value moonlightos-launcher.service)"
+test "$launcher_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-launcher.service)"
+echo MOONLIGHTOS_SMOKE_BLUETOOTH_READY
+
 systemctl start --no-block moonlightos-moonlight.service
 wait_for_file /run/moonlightos/moonlight-ready Moonlight
 systemctl stop moonlightos-moonlight.service

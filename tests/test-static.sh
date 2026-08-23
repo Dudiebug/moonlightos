@@ -27,11 +27,11 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.5 ]]
+[[ "$(< VERSION)" == 0.1.6 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.5-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.6-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
 rg -q '^  actions: read$' .github/workflows/release-v1.1.yml
-rg -q 'git/matching-refs/tags/0\.1\.5' .github/workflows/release-v1.1.yml
+rg -q 'git/matching-refs/tags/0\.1\.6' .github/workflows/release-v1.1.yml
 ! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v1.1.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
@@ -60,10 +60,15 @@ removed_units='moonlightos-escape''-guard|moonlightos-stop''-active-app'
 rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wpasupplicant$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^bluez$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^libspa-0\.2-bluetooth$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^python3-dbus$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^python3-gi$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^rfkill$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wlr-randr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'qrencode -t ANSIUTF8' scripts/moonlightos-tailscale-enrollment
 rg -q "trap 'rm -f --.*URL_FILE.*' EXIT" scripts/moonlightos-tailscale
-! rg -q 'python3-gi|gir1.2-gtk|libfuse' config/live-build/package-lists/moonlightos.list.chroot
+! rg -q 'gir1.2-gtk|libfuse' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
 rg -q 'unit=1,file=' tests/qemu-smoke.sh
 rg -q 'screendump' tests/qemu-smoke.sh
@@ -78,6 +83,7 @@ rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'moonlightos-support-export.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q 'bluetooth.service moonlightos-bluetooth.service' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 ! rg -q "$removed_units" config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q '^PathExists=/run/moonlightos/support-export.request$' services/moonlightos-support-export.path
 rg -q '^ExecStart=/usr/libexec/moonlightos-support-export$' services/moonlightos-support-export.service
@@ -85,7 +91,15 @@ removed_feature='TRIPLE[- ]?TAP|triple[- ]?tap|escape''-guard|stop''-active-app'
 ! rg -q -g '!tests/test-static.sh' "$removed_feature" launcher scripts services build config docs tests
 rg -q 'EXIT THE APP TO RETURN' launcher/moonlightos-launcher.py
 rg -q 'WILL MOUNT TEMPORARILY' launcher/moonlightos_support.py
-rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale' services/moonlightos-support-export.service
+rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale.*-\/var\/lib\/bluetooth' services/moonlightos-support-export.service
+rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-bluetooth.service
+rg -q '^User=moonlightos$' services/moonlightos-bluetooth.service
+rg -q '^ExecStart=/usr/libexec/moonlightos-bluetoothd$' services/moonlightos-bluetooth.service
+rg -q 'moonlightos_bluetooth.py' build/configure.sh
+rg -q 'moonlightos-bluetoothd' build/configure.sh
+for forbidden in 'bluetooth''ctl' 'curses\.endwin' 'terminal_''command' 'SIG''INT' 'kill\(' 'shell=True'; do
+  ! rg -n "$forbidden" launcher/moonlightos_bluetooth.py scripts/moonlightos-bluetoothd
+done
 ! rg -q '\bsudo\b' launcher scripts/moonlightos-support-export services/moonlightos-support-export.service
 rg -q '\["wlr-randr", "--output"' launcher/moonlightos_display.py
 rg -q 'append\("--dryrun"\)' launcher/moonlightos_display.py
@@ -95,13 +109,16 @@ rg -q '/usr/bin/setpriv' scripts/moonlightos-support-export tests/test_support.p
 rg -q '^ExecStart=/usr/sbin/usbipd --ipv4$' services/moonlightos-usbipd.service
 ! rg -q -- '--foreground' services/moonlightos-usbipd.service
 rg -q 'MOONLIGHTOS_SMOKE_USBIP_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
+rg -q 'MOONLIGHTOS_SMOKE_BLUETOOTH_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
+rg -q 'NRestarts' scripts/moonlightos-qemu-smoke
 digest_pattern='s''ha-?256|s''ha256|\.s''ha256'
 ! rg -n -i "$digest_pattern" -g '!.git/**' -g '!tests/test-static.sh' .
 rg -q 'MIN_FREE' scripts/moonlightos-support-export
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_display.py \
-  launcher/moonlightos_support.py launcher/gamepad-nav.py \
-  scripts/moonlightos-host-address scripts/moonlightos-support-export
+  launcher/moonlightos_support.py launcher/moonlightos_bluetooth.py launcher/gamepad-nav.py \
+  scripts/moonlightos-host-address scripts/moonlightos-support-export \
+  scripts/moonlightos-bluetoothd
 
 python3 - <<'PY'
 import configparser, pathlib, re, subprocess
@@ -155,6 +172,7 @@ fi
 
 for required in \
   services/moonlightos-launcher.service \
+  services/moonlightos-bluetooth.service \
   services/moonlightos-moonlight.service \
   services/moonlightos-chiaki.service \
   services/moonlightos-firefox.service \

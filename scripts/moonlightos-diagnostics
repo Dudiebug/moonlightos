@@ -31,6 +31,14 @@ report() {
   wpctl status 2>&1 | sed -n '1,100p' || true
   aplay -l 2>&1 || true
   echo
+  echo '== Bluetooth =='
+  /usr/libexec/moonlightos-bluetoothd --snapshot 2>&1 || true
+  rfkill list bluetooth 2>&1 || true
+  printf 'bluetooth.service: '; systemctl is-active bluetooth.service 2>&1 || true
+  printf 'moonlightos-bluetooth.service: '; systemctl is-active moonlightos-bluetooth.service 2>&1 || true
+  journalctl -u moonlightos-bluetooth.service --since '-1 hour' --priority=warning \
+    --no-pager --output=short-iso 2>&1 | tail -n 40 || true
+  echo
   echo '== Network =='
   nmcli device status 2>&1 || true
   ip -brief -4 address 2>&1 || true
