@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import hashlib
+import base64
 import os
 import pathlib
 import re
@@ -54,7 +54,7 @@ class Output:
     def identity(self) -> str:
         if not self.description:
             return ""
-        return hashlib.sha256(self.description.encode("utf-8")).hexdigest()
+        return base64.urlsafe_b64encode(self.description.encode("utf-8")).decode("ascii")
 
     @property
     def current_mode(self) -> Mode | None:
@@ -189,7 +189,7 @@ def load_saved_display(config_path: pathlib.Path = CONFIG) -> dict[str, str]:
             values[key] = value.strip()
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", values.get("output", "")):
         return {}
-    if not re.fullmatch(r"[0-9a-f]{64}", values.get("identity", "")):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{4,512}={0,2}", values.get("identity", "")):
         return {}
     if not re.fullmatch(r"[1-9]\d{1,4}x[1-9]\d{1,4}", values.get("resolution", "")):
         return {}

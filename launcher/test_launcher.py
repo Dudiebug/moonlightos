@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -55,21 +56,61 @@ class LauncherHelpersTest(unittest.TestCase):
         launcher.activate()
         launcher.launch_app.assert_called_once_with("firefox")
 
+    def test_terminal_command_keyboard_interrupt_restores_launcher(self):
+        launcher = object.__new__(self.module.Launcher)
+        launcher.restore_curses = mock.Mock()
+        with mock.patch.object(self.module.curses, "def_prog_mode"), mock.patch.object(
+            self.module.curses, "endwin"
+        ), mock.patch.object(
+            self.module.subprocess, "run", side_effect=KeyboardInterrupt
+        ):
+            self.assertEqual(launcher.terminal_command(["example"]), 130)
+        launcher.restore_curses.assert_called_once_with()
+
     def test_tailscale_return_restores_launcher_runtime_state(self):
         launcher = object.__new__(self.module.Launcher)
         launcher.selected = 3
         launcher.request = mock.Mock()
         launcher.terminal_command = mock.Mock(return_value=0)
         launcher.prepare_session = mock.Mock()
-        with mock.patch.object(
-            self.module, "network_summary", return_value="192.0.2.25  ONLINE"
-        ), mock.patch.object(self.module.time, "monotonic", return_value=55.0):
+        with mock.patch.object(self.module.time, "monotonic", return_value=55.0), mock.patch.object(
+            self.module.os, "getuid", return_value=1000
+        ), mock.patch.object(self.module.pathlib.Path, "lstat", side_effect=FileNotFoundError):
             launcher.activate()
         launcher.request.assert_called_once_with("tailscale-enroll")
         launcher.terminal_command.assert_called_once_with(["moonlightos-tailscale-enrollment"])
         launcher.prepare_session.assert_called_once_with()
-        self.assertEqual(launcher.status, "192.0.2.25  ONLINE")
+        self.assertEqual(launcher.status, "TAILSCALE CONNECTED")
         self.assertEqual(launcher.last_status_update, 55.0)
+
+    def test_tailscale_interrupt_leaves_useful_status(self):
+        launcher = object.__new__(self.module.Launcher)
+        launcher.selected = 3
+        launcher.request = mock.Mock()
+        launcher.terminal_command = mock.Mock(return_value=130)
+        launcher.prepare_session = mock.Mock()
+        with mock.patch.object(self.module.time, "monotonic", return_value=55.0), mock.patch.object(
+            self.module.os, "getuid", return_value=1000
+        ), mock.patch.object(self.module.pathlib.Path, "lstat", side_effect=FileNotFoundError):
+            launcher.activate()
+        self.assertEqual(launcher.status, "TAILSCALE SETUP CLOSED")
+        launcher.prepare_session.assert_called_once_with()
+
+    def test_tailscale_removes_stale_url_before_request(self):
+        launcher = object.__new__(self.module.Launcher)
+        launcher.selected = 3
+        launcher.terminal_command = mock.Mock(return_value=130)
+        launcher.prepare_session = mock.Mock()
+        with tempfile.TemporaryDirectory() as directory:
+            run = pathlib.Path(directory)
+            stale = run / "tailscale-auth-url"
+            stale.write_text("https://login.tailscale.com/a/stale\n", encoding="utf-8")
+            launcher.request = mock.Mock(side_effect=lambda _name: self.assertFalse(stale.exists()))
+            with mock.patch.object(self.module, "RUN", run), mock.patch.object(
+                self.module.time, "monotonic", return_value=55.0
+            ):
+                launcher.activate()
+        launcher.request.assert_called_once_with("tailscale-enroll")
 
     def test_settings_menu_and_keyboard_navigation(self):
         self.assertEqual(
@@ -142,7 +183,7 @@ class LauncherHelpersTest(unittest.TestCase):
         ):
             settings.generate_support_file()
         settings.show_message.assert_called_once_with(
-            "SUPPORT FILE CREATED", "SAVED: /media/usb/support.tar.gz"
+            "SUPPORT FILE CREATED", "Support file created. SAVED: /media/usb/support.tar.gz"
         )
         self.assertEqual(settings.status, "SAVED: /media/usb/support.tar.gz")
         self.assertIn(mock.call(1000), screen.timeout.call_args_list)

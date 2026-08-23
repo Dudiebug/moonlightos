@@ -8,7 +8,7 @@ StartLimitBurst=5
 [Service]
 Type=simple
 ExecStartPre=/sbin/modprobe usbip_host
-ExecStart=/usr/sbin/usbipd --foreground
+ExecStart=/usr/sbin/usbipd --ipv4
 ExecStopPost=/usr/sbin/moonlightos-usbip unbind-all
 Restart=on-failure
 RestartSec=2

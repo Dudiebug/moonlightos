@@ -117,7 +117,10 @@ enroll() {
 }
 
 case ${1:-} in
-  enroll) enroll ;;
+  enroll)
+    trap 'rm -f -- "$URL_FILE"' EXIT
+    enroll
+    ;;
   apply)
     [[ $(backend_state) == Running ]] || { echo 'Tailscale is not connected.' >&2; exit 69; }
     apply_incremental

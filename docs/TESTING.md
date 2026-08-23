@@ -7,12 +7,12 @@ make test
 ```
 
 These tests validate shell/Python syntax, service references, no obvious secret
-patterns, locked artifact hashes, default-deny Tailscale/USB-IP settings, and a
+patterns, fixed artifact versions/URLs, default-deny Tailscale/USB-IP settings, and a
 fake-sysfs USB allowlist case. Focused tests also cover display-mode parsing,
 valid resolution/refresh pairs, missing connectors/modes, changed display
 identity, malformed configuration preservation, Settings navigation, controller
-mapping, support redaction, removable-media policy, manifest verification,
-atomic copy, and failed-copy cleanup. They do not require a tailnet.
+mapping, support redaction, removable-media policy, safe archive streaming,
+atomic copy, checked unmount ordering, and failed-copy cleanup. They do not require a tailnet.
 
 ## QEMU ISO smoke test
 
@@ -21,7 +21,7 @@ sudo apt install qemu-system-x86 ovmf
 make qemu-smoke
 ```
 
-The script boots `build/out/moonlightos-0.1.2-amd64.iso` with serial
+The script boots `build/out/moonlightos-0.1.5-amd64.iso` with serial
 output, a virtual Ethernet NIC, and UEFI when OVMF is available. Success means
 the boot reached the MoonlightOS launcher service marker. QEMU does not prove
 Intel VA-API, display audio, gamepad, USB/IP hardware, or streaming.
@@ -55,14 +55,14 @@ and complete Debian Installer manually:
 qemu-img create -f qcow2 build/out/moonlightos-install-test.qcow2 24G
 qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom build/out/moonlightos-0.1.2-amd64.iso \
+  -cdrom build/out/moonlightos-0.1.5-amd64.iso \
   -drive file=build/out/moonlightos-install-test.qcow2,if=virtio \
   -device virtio-vga -display gtk \
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0
 ```
 
-After reboot, verify launcher/app exit/crash recovery and compare hashes of
-`/var/lib/moonlightos/config.ini` before/after reboot.
+After reboot, verify launcher/app exit/crash recovery and confirm the saved
+`/var/lib/moonlightos/config.ini` values remain unchanged.
 
 ## Physical DCC36X3 checklist (must be recorded, never inferred)
 
@@ -94,7 +94,7 @@ Applications and acceleration:
 
 Support export:
 
-- [ ] Export to a second writable removable USB and verify archive/sidecar/manifest
+- [ ] Export to a second writable removable USB and verify exactly one readable archive
 - [ ] Inspect the extracted archive for secrets
 - [ ] Export to a configured boot-USB persistence partition
 - [ ] Confirm the ISO9660 boot filesystem is not offered

@@ -64,7 +64,7 @@ class DisplayTest(unittest.TestCase):
         output = display.parse_wlr_randr(SAMPLE)[0]
         saved = {
             "output": "DP-1",
-            "identity": "0" * 64,
+            "identity": "different-display",
             "resolution": "1920x1080",
             "refresh_mhz": "120000",
         }

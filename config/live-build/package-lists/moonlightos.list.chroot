@@ -6,6 +6,7 @@ systemd-sysv
 dbus-user-session
 sudo
 network-manager
+wpasupplicant
 iproute2
 iputils-ping
 ethtool

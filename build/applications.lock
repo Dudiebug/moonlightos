@@ -1,3 +1,3 @@
-# name|version|url|sha256|installed filename
-moonlight|6.1.0|https://github.com/moonlight-stream/moonlight-qt/releases/download/v6.1.0/Moonlight-6.1.0-x86_64.AppImage|0e855ffd22d407e18ab5fdb575fed5f01ca119a3f91993c5f0213f15ac80b400|moonlight.AppImage
-chiaki-ng|1.10.0|https://github.com/streetpea/chiaki-ng/releases/download/v1.10.0/chiaki-ng.AppImage_x86_64|cac42c21a19a111f2f0729bb9eef7d3878c6d2a4f06e017d383aff2aba719fd3|chiaki-ng.AppImage
+# name|version|url|installed filename
+moonlight|6.1.0|https://github.com/moonlight-stream/moonlight-qt/releases/download/v6.1.0/Moonlight-6.1.0-x86_64.AppImage|moonlight.AppImage
+chiaki-ng|1.10.0|https://github.com/streetpea/chiaki-ng/releases/download/v1.10.0/chiaki-ng.AppImage_x86_64|chiaki-ng.AppImage
