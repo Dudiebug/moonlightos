@@ -47,7 +47,8 @@ production application services and requires `MOONLIGHTOS_APP_STARTED moonlight`
 `MOONLIGHTOS_APP_STARTED chiaki-ng`, and `MOONLIGHTOS_APP_STARTED firefox`
 after each real application remains alive for five seconds. It also proves the
 Bluetooth control service handles an absent adapter and survives restarts of
-BlueZ and its own service without changing the launcher PID or restart count.
+BlueZ and its own service without changing the launcher or audio-session PID
+and restart counts.
 Launcher output is
 mirrored to the boot console and remains available in
 `/var/log/moonlightos/launcher.log`.

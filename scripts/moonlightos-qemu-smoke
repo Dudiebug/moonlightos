@@ -52,11 +52,22 @@ wait_for_bluetooth_service() {
 wait_for_bluetooth_service
 launcher_pid=$(systemctl show --property=MainPID --value moonlightos-launcher.service)
 launcher_restarts=$(systemctl show --property=NRestarts --value moonlightos-launcher.service)
+audio_pid=$(systemctl show --property=MainPID --value moonlightos-audio.service)
+audio_restarts=$(systemctl show --property=NRestarts --value moonlightos-audio.service)
 systemctl restart bluetooth.service
 systemctl restart moonlightos-bluetooth.service
 wait_for_bluetooth_service
 test "$launcher_pid" = "$(systemctl show --property=MainPID --value moonlightos-launcher.service)"
 test "$launcher_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-launcher.service)"
+test "$audio_pid" = "$(systemctl show --property=MainPID --value moonlightos-audio.service)"
+test "$audio_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-audio.service)"
+XDG_RUNTIME_DIR=/run/moonlightos wpctl status > /tmp/moonlightos-audio-smoke.txt 2>&1 || {
+  systemctl --no-pager --full status moonlightos-audio.service >&2 || true
+  cat /var/log/moonlightos/audio.log >&2 || true
+  cat /tmp/moonlightos-audio-smoke.txt >&2 || true
+  echo 'PipeWire did not remain ready after Bluetooth service restarts.' >&2
+  exit 1
+}
 echo MOONLIGHTOS_SMOKE_BLUETOOTH_READY
 
 systemctl start --no-block moonlightos-moonlight.service

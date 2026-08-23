@@ -95,6 +95,7 @@ rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale.
 rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-bluetooth.service
 rg -q '^User=moonlightos$' services/moonlightos-bluetooth.service
 rg -q '^ExecStart=/usr/libexec/moonlightos-bluetoothd$' services/moonlightos-bluetooth.service
+rg -q '^After=.*dbus.service.*bluetooth.service$' services/moonlightos-audio.service
 rg -q 'moonlightos_bluetooth.py' build/configure.sh
 rg -q 'moonlightos-bluetoothd' build/configure.sh
 for forbidden in 'bluetooth''ctl' 'curses\.endwin' 'terminal_''command' 'SIG''INT' 'kill\(' 'shell=True'; do
@@ -111,6 +112,7 @@ rg -q '^ExecStart=/usr/sbin/usbipd --ipv4$' services/moonlightos-usbipd.service
 rg -q 'MOONLIGHTOS_SMOKE_USBIP_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'MOONLIGHTOS_SMOKE_BLUETOOTH_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'NRestarts' scripts/moonlightos-qemu-smoke
+rg -q 'moonlightos-audio.service' scripts/moonlightos-qemu-smoke
 digest_pattern='s''ha-?256|s''ha256|\.s''ha256'
 ! rg -n -i "$digest_pattern" -g '!.git/**' -g '!tests/test-static.sh' .
 rg -q 'MIN_FREE' scripts/moonlightos-support-export

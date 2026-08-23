@@ -1,6 +1,7 @@
 [Unit]
 Description=MoonlightOS PipeWire audio session
-After=systemd-tmpfiles-setup.service
+Wants=bluetooth.service
+After=systemd-tmpfiles-setup.service dbus.service bluetooth.service
 
 [Service]
 Type=simple
