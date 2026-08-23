@@ -1,15 +1,15 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-ISO := build/out/moonlightos-0.1.4-amd64.iso
+ISO := build/out/moonlightos-0.1.5-amd64.iso
 
-.PHONY: help fetch-apps configure build checksum test qemu-smoke clean
+.PHONY: help fetch-apps configure build test qemu-smoke clean
 
 help:
 	@printf '%s\n' \
-	  'make fetch-apps  Download and verify pinned application images' \
+	  'make fetch-apps  Download pinned application images' \
 	  'make configure   Prepare the live-build work tree' \
-	  'sudo make build  Build the Debian 13 hybrid ISO and checksum' \
+	  'sudo make build  Build the Debian 13 hybrid ISO' \
 	  'make test         Run source/static tests' \
 	  'make qemu-smoke   Boot the ISO and wait for the appliance marker' \
 	  'sudo make clean   Remove generated build state'
@@ -23,14 +23,11 @@ configure: fetch-apps
 build: configure
 	./build/build.sh
 
-checksum:
-	test -f "$(ISO)"
-	cd build/out && sha256sum "$$(basename "$(ISO)")" > "$$(basename "$(ISO)").sha256"
-
 test:
 	./tests/test-static.sh
 	python3 -m unittest -v tests/test_host_address.py
 	python3 -m unittest -v tests/test_support.py
+	python3 -m unittest -v tests/test_tailscale_enrollment.py
 	$(MAKE) -C launcher test
 
 

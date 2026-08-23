@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-0.1.2-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.5-amd64.iso}
 SCREENSHOT=${MOONLIGHTOS_QEMU_SCREENSHOT:-/tmp/moonlightos-qemu-smoke.ppm}
 command -v qemu-system-x86_64 >/dev/null || { echo 'qemu-system-x86_64 is required' >&2; exit 127; }
 [[ -f "$ISO" ]] || { echo "ISO not found: $ISO" >&2; exit 66; }
@@ -124,6 +124,7 @@ fail() {
 
 wait_for_marker 'MOONLIGHTOS_LAUNCHER_READY' 180 || fail 'Launcher did not become ready.'
 capture_screen
+wait_for_marker 'MOONLIGHTOS_SMOKE_USBIP_READY' 30 || fail 'USB/IP daemon did not remain active.'
 
 # A QEMU fw_cfg flag activates the otherwise inert smoke driver inside the
 # guest. It reports success only after all three real application processes
@@ -133,4 +134,4 @@ capture_screen
 
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
-echo 'QEMU smoke test passed: launcher, Moonlight, Chiaki-ng, and Firefox started.'
+echo 'QEMU smoke test passed: launcher, USB/IP, Moonlight, Chiaki-ng, and Firefox started.'

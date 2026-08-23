@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import fcntl
-import hashlib
 import json
 import os
 import pathlib
@@ -172,11 +171,20 @@ def session_environment() -> dict[str, str]:
 
 def user_command(command: list[str], environment: dict[str, str]) -> list[str]:
     try:
-        pwd.getpwnam("moonlightos")
+        account = pwd.getpwnam("moonlightos")
     except KeyError:
         return command
     assignments = [f"{key}={value}" for key, value in environment.items()]
-    return ["runuser", "-u", "moonlightos", "--", "env", *assignments, *command]
+    return [
+        "/usr/bin/setpriv",
+        f"--reuid={account.pw_uid}",
+        f"--regid={account.pw_gid}",
+        "--init-groups",
+        "--",
+        "/usr/bin/env",
+        *assignments,
+        *command,
+    ]
 
 
 def collect(bundle: pathlib.Path) -> None:
@@ -259,7 +267,19 @@ def collect(bundle: pathlib.Path) -> None:
     add_command(bundle, "network/ipv4-addresses.txt", ["ip", "-4", "address", "show"])
     add_command(bundle, "network/routes.txt", ["ip", "route", "show", "table", "all"])
     add_command(bundle, "network/link-state.txt", ["ip", "-details", "link", "show"])
-    add_command(bundle, "network/dns-state.txt", ["resolvectl", "status"])
+    dns_state = command_output(
+        ["nmcli", "--fields", "GENERAL.DEVICE,IP4.DNS,IP4.DOMAIN", "device", "show"]
+    )
+    try:
+        resolv_conf = pathlib.Path("/etc/resolv.conf").read_text(
+            encoding="utf-8", errors="replace"
+        )
+    except OSError as error:
+        resolv_conf = f"Unavailable: {error}\n"
+    write_text(
+        bundle / "network/dns-state.txt",
+        f"NetworkManager DNS state:\n{dns_state}\n/etc/resolv.conf:\n{resolv_conf}",
+    )
 
     tailscale_raw = command_output(["tailscale", "status", "--json"])
     try:
@@ -284,8 +304,10 @@ def collect(bundle: pathlib.Path) -> None:
             "network-manager",
             "pipewire",
             "tailscale",
+            "usbip",
             "wireplumber",
             "wlr-randr",
+            "wpasupplicant",
             "xwayland",
         ],
     )
@@ -350,34 +372,31 @@ def collect(bundle: pathlib.Path) -> None:
     )
 
 
-def create_manifest(bundle: pathlib.Path) -> None:
-    lines = []
-    for path in sorted(bundle.rglob("*")):
-        if path.is_file() and not path.is_symlink() and path.name != "MANIFEST.sha256":
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            lines.append(f"{digest}  {path.relative_to(bundle).as_posix()}")
-    (bundle / "MANIFEST.sha256").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
 def verify_archive(archive: pathlib.Path) -> None:
     with tarfile.open(archive, "r:gz") as container:
         members = container.getmembers()
-        if any(member.issym() or member.islnk() for member in members):
-            raise RuntimeError("support archive unexpectedly contains a link")
-        manifest_member = next(
-            (member for member in members if member.name.endswith("/MANIFEST.sha256")), None
-        )
-        if manifest_member is None:
-            raise RuntimeError("support archive manifest is missing")
-        manifest_stream = container.extractfile(manifest_member)
-        if manifest_stream is None:
-            raise RuntimeError("support archive manifest is unreadable")
-        for line in manifest_stream.read().decode("utf-8").splitlines():
-            digest, relative = line.split("  ", 1)
-            member = container.getmember(f"moonlightos-support/{relative}")
+        regular_files = 0
+        found_root = False
+        for member in members:
+            path = pathlib.PurePosixPath(member.name)
+            if path.is_absolute() or ".." in path.parts:
+                raise RuntimeError("support archive contains an unsafe path")
+            if not path.parts or path.parts[0] != "moonlightos-support":
+                raise RuntimeError("support archive contains a path outside its root")
+            if member.name == "moonlightos-support" and member.isdir():
+                found_root = True
+            if not member.isdir() and not member.isreg():
+                raise RuntimeError("support archive contains a non-file member")
+            if not member.isreg():
+                continue
+            regular_files += 1
             stream = container.extractfile(member)
-            if stream is None or hashlib.sha256(stream.read()).hexdigest() != digest:
-                raise RuntimeError(f"support archive manifest mismatch: {relative}")
+            if stream is None:
+                raise RuntimeError("support archive contains an unreadable file")
+            while stream.read(1024 * 1024):
+                pass
+        if not found_root or regular_files == 0:
+            raise RuntimeError("support archive is missing required support files")
 
 
 def free_bytes(path: pathlib.Path) -> int:
@@ -486,21 +505,69 @@ def write_status(request_id: str, state: str, message: str, destination: str = "
             pass
 
 
-def file_sha256(path: pathlib.Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def journal_message(message: str, *, error: bool = False) -> None:
+    cleaned = safe_terminal_text(redact_text(message), 500)
+    print(cleaned, file=sys.stderr if error else sys.stdout, flush=True)
+
+
+def settle_devices() -> None:
+    try:
+        result = subprocess.run(
+            ["udevadm", "settle", "--timeout=5"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=6,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        journal_message(f"Support export device settle unavailable: {error}", error=True)
+        return
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "udevadm settle failed").strip()
+        journal_message(f"Support export device settle warning: {detail}", error=True)
+
+
+def checked_unmount(mountpoint: str) -> None:
+    result = subprocess.run(
+        ["umount", "--", mountpoint],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=15,
+    )
+    if result.returncode:
+        detail = safe_terminal_text(
+            redact_text((result.stderr or result.stdout or "unmount failed").strip()), 180
+        )
+        raise RuntimeError(
+            "support file was written, but the drive is not safe to remove: " + detail
+        )
+
+
+def finish_export(
+    request_id: str,
+    destination: Destination,
+    final: pathlib.Path,
+    mounted_here: bool,
+) -> bool:
+    if mounted_here:
+        checked_unmount(destination.mountpoint)
+        mounted_here = False
+        shown = f"{destination.device}:/{final.name}"
+        message = "Support file created; drive is safe to remove"
+    else:
+        shown = str(final)
+        message = "Support file created; safely eject or unmount before removing the drive"
+    write_status(request_id, "success", message, shown)
+    journal_message(f"Support export succeeded: {shown}")
+    return mounted_here
 
 
 def atomic_export(source: pathlib.Path, destination: pathlib.Path, filename: str) -> pathlib.Path:
     final = destination / filename
-    sidecar = destination / f"{filename}.sha256"
     partial = destination / f".{filename}.partial"
-    side_partial = destination / f".{filename}.sha256.partial"
     created_final = False
-    if final.exists() or sidecar.exists():
+    if final.exists():
         raise RuntimeError("support archive filename already exists")
     try:
         with source.open("rb") as incoming, partial.open("xb") as outgoing:
@@ -508,18 +575,9 @@ def atomic_export(source: pathlib.Path, destination: pathlib.Path, filename: str
             os.fchmod(outgoing.fileno(), 0o644)
             outgoing.flush()
             os.fsync(outgoing.fileno())
-        if file_sha256(partial) != file_sha256(source):
-            raise RuntimeError("copied support archive hash mismatch")
         verify_archive(partial)
         os.replace(partial, final)
         created_final = True
-        digest = file_sha256(final)
-        with side_partial.open("x", encoding="ascii") as stream:
-            stream.write(f"{digest}  {filename}\n")
-            os.fchmod(stream.fileno(), 0o644)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(side_partial, sidecar)
         directory_fd = os.open(destination, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory_fd)
@@ -528,7 +586,7 @@ def atomic_export(source: pathlib.Path, destination: pathlib.Path, filename: str
         os.sync()
         return final
     except Exception:
-        for path in (partial, side_partial, sidecar):
+        for path in (partial,):
             try:
                 path.unlink()
             except FileNotFoundError:
@@ -570,6 +628,7 @@ def run() -> int:
         request_id = str(request["request_id"])
         REQUEST.unlink(missing_ok=True)
         write_status(request_id, "working", "Collecting support information")
+        settle_devices()
         destination = validate_destination(request)
         destination, mounted_here = mount_labeled_destination(destination)
         target = pathlib.Path(destination.mountpoint)
@@ -585,7 +644,6 @@ def run() -> int:
             bundle = temporary_root / "moonlightos-support"
             bundle.mkdir()
             collect(bundle)
-            create_manifest(bundle)
             local_archive = temporary_root / archive_filename()
             with tarfile.open(local_archive, "w:gz", dereference=False) as container:
                 container.add(bundle, arcname="moonlightos-support", recursive=True)
@@ -594,6 +652,7 @@ def run() -> int:
             # Revalidate the selected device/mount immediately before writing.
             if not os.path.ismount(target) or not path_is_writable(str(target)):
                 raise RuntimeError("support destination disappeared before writing")
+            settle_devices()
             current = validate_destination(
                 {
                     "device": destination.device,
@@ -613,12 +672,13 @@ def run() -> int:
         finally:
             shutil.rmtree(temporary_root, ignore_errors=True)
 
-        shown = f"{destination.device}:/{final.name}" if mounted_here else str(final)
-        write_status(request_id, "success", "Support file created", shown)
+        mounted_here = finish_export(request_id, destination, final, mounted_here)
         return 0
     except Exception as error:
         REQUEST.unlink(missing_ok=True)
-        write_status(request_id, "failed", str(error))
+        message = safe_terminal_text(redact_text(str(error)), 240)
+        write_status(request_id, "failed", message)
+        journal_message(f"Support export failed: {message}", error=True)
         return 1
     finally:
         if mounted_here and destination is not None:

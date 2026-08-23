@@ -206,7 +206,7 @@ class Launcher:
         center = max(6, height // 2 - 1)
         add_centered(self.screen, center, f"STARTING {label}  {frame}")
         add_centered(self.screen, center + 2, "PLEASE WAIT")
-        add_centered(self.screen, height - 3, "TRIPLE-TAP ESC IN AN APP TO RETURN")
+        add_centered(self.screen, height - 3, "EXIT THE APP TO RETURN")
         self.screen.refresh()
 
     def show_launch_failure(self, label: str, message: str) -> None:
@@ -314,11 +314,17 @@ class Launcher:
         curses.def_prog_mode()
         curses.endwin()
         try:
-            result = subprocess.run(command, check=False)
+            try:
+                result = subprocess.run(command, check=False)
+            except KeyboardInterrupt:
+                return 130
             if wait_message:
                 print()
                 print(wait_message)
-                input()
+                try:
+                    input()
+                except KeyboardInterrupt:
+                    return 130
             return result.returncode
         finally:
             self.restore_curses()
@@ -328,12 +334,23 @@ class Launcher:
         if action in APP_LAUNCH:
             self.launch_app(action)
         elif action == "tailscale":
+            auth_url = RUN / "tailscale-auth-url"
+            try:
+                if auth_url.lstat().st_uid == os.getuid():
+                    auth_url.unlink()
+            except FileNotFoundError:
+                pass
             self.request("tailscale-enroll")
-            self.terminal_command(["moonlightos-tailscale-enrollment"])
+            result = self.terminal_command(["moonlightos-tailscale-enrollment"])
             # Rebuild runtime state after the external terminal UI. This avoids
             # the broken input/app-launch state seen after enrollment returns.
             self.prepare_session()
-            self.status = network_summary()
+            if result == 0:
+                self.status = "TAILSCALE CONNECTED"
+            elif result in {130, 143}:
+                self.status = "TAILSCALE SETUP CLOSED"
+            else:
+                self.status = "TAILSCALE SETUP FAILED"
             self.last_status_update = time.monotonic()
         elif action == "settings":
             Settings(self.screen, self.terminal_command).run()
@@ -639,8 +656,12 @@ class Settings:
                     export_state = state.get("state", "")
                     if export_state == "success":
                         destination_name = state.get("destination", "") or destination.display_name
+                        result_message = state.get("message", "") or "SUPPORT FILE CREATED"
                         self.screen.timeout(1000)
-                        self.show_message("SUPPORT FILE CREATED", f"SAVED: {destination_name}")
+                        self.show_message(
+                            "SUPPORT FILE CREATED",
+                            f"{result_message}. SAVED: {destination_name}",
+                        )
                         self.status = f"SAVED: {destination_name}"
                         return
                     if export_state == "failed":

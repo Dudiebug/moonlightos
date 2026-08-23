@@ -1,4 +1,4 @@
-# MoonlightOS v0.1.2
+# MoonlightOS v0.1.5
 
 MoonlightOS is a Debian 13 (Trixie) x86_64 gaming-streaming appliance. It boots
 directly into a small controller-friendly launcher for Moonlight, chiaki-ng,
@@ -9,13 +9,13 @@ general-purpose desktop.
 > physical Dell OptiPlex DCC36X3 validation matrix must be completed before
 > calling this a production image. See [TESTING.md](docs/TESTING.md).
 
-## What v0.1.2 contains
+## What v0.1.5 contains
 
 - Debian standard kernel, systemd, NetworkManager, nftables, PipeWire, ALSA
-- IPv4-only wired networking; IPv6 is disabled in v0.1.2
+- IPv4-only networking; IPv6 is disabled in v0.1.5
 - Intel i915, Mesa Vulkan, VA-API, and Intel media-driver packages
 - Cage as the direct DRM/KMS Wayland kiosk compositor; no desktop environment
-- Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned by SHA256
+- Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned to fixed release URLs
 - Firefox ESR from Debian 13, running natively on Wayland with a persistent profile
 - black-and-white full-screen terminal launcher with keyboard and common gamepad navigation
 - controller-friendly display settings based only on modes advertised by Cage/wlroots
@@ -42,12 +42,11 @@ sudo make build
 Output:
 
 ```text
-build/out/moonlightos-0.1.2-amd64.iso
-build/out/moonlightos-0.1.2-amd64.iso.sha256
+build/out/moonlightos-0.1.5-amd64.iso
 ```
 
-`scripts/fetch-apps.sh` downloads only the versions in
-`build/applications.lock` and rejects a hash mismatch. `build/configure.sh`
+`scripts/fetch-apps.sh` downloads only the fixed versions and HTTPS URLs in
+`build/applications.lock`. `build/configure.sh`
 extracts their pinned payloads into the read-only image so runtime FUSE is not
 required. Firefox is installed from Debian's signed repositories during the
 image build. No application binary is committed to Git.
@@ -67,7 +66,7 @@ the disk-selection confirmation because silently erasing a disk is unsafe.
 
 The installed system preserves application configuration normally. A live USB
 needs a separate persistence partition; installation is the supported durable
-mode for v0.1.2. Local LAN streaming and the launcher do not depend on Tailscale.
+mode for v0.1.5. Local LAN streaming and the launcher do not depend on Tailscale.
 
 ## Target hardware
 

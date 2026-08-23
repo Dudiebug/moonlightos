@@ -7,6 +7,7 @@ import re
 import sys
 import tarfile
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -210,7 +211,6 @@ class ExporterTest(unittest.TestCase):
         bundle = directory / "moonlightos-support"
         bundle.mkdir()
         exporter.write_text(bundle / "status.txt", f"password={secret}\nBearer {secret}\n")
-        exporter.create_manifest(bundle)
         archive = directory / "fixture.tar.gz"
         with tarfile.open(archive, "w:gz", dereference=False) as container:
             container.add(bundle, arcname="moonlightos-support")
@@ -262,11 +262,12 @@ class ExporterTest(unittest.TestCase):
         self.assertEqual(structured["AuthKey"], "[REDACTED]")
         self.assertEqual(structured["Peer"]["DNSName"], "host.ts.net")
 
-    def test_fixture_archive_manifest_and_no_secret_leak(self):
+    def test_fixture_archive_has_no_secret_leak_or_manifest(self):
         secret = "FAKESECRET-UNIQUE-999"
         with tempfile.TemporaryDirectory() as directory:
             archive = self.make_archive(pathlib.Path(directory), secret)
             with tarfile.open(archive, "r:gz") as container:
+                names = container.getnames()
                 combined = b"\n".join(
                     container.extractfile(member).read()
                     for member in container.getmembers()
@@ -274,7 +275,57 @@ class ExporterTest(unittest.TestCase):
                 )
             self.assertNotIn(secret.encode(), combined)
             self.assertIn(b"[REDACTED]", combined)
-            self.assertIn(b"MANIFEST", b"MANIFEST")
+            self.assertEqual(names, ["moonlightos-support", "moonlightos-support/status.txt"])
+
+    def test_user_command_uses_one_way_numeric_privilege_drop(self):
+        account = types.SimpleNamespace(pw_uid=1000, pw_gid=1001)
+        environment = {"HOME": "/run/moonlightos", "WAYLAND_DISPLAY": "wayland-0"}
+        with mock.patch.object(exporter.pwd, "getpwnam", return_value=account):
+            command = exporter.user_command(["wpctl", "status"], environment)
+        self.assertEqual(command[:6], [
+            "/usr/bin/setpriv",
+            "--reuid=1000",
+            "--regid=1001",
+            "--init-groups",
+            "--",
+            "/usr/bin/env",
+        ])
+        self.assertNotIn("runuser", command)
+        self.assertIn("HOME=/run/moonlightos", command)
+        self.assertEqual(command[-2:], ["wpctl", "status"])
+
+    def test_archive_rejects_links_traversal_and_special_members(self):
+        for kind in ("link", "traversal", "device"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                archive = pathlib.Path(directory) / f"{kind}.tar.gz"
+                with tarfile.open(archive, "w:gz") as container:
+                    root = tarfile.TarInfo("moonlightos-support")
+                    root.type = tarfile.DIRTYPE
+                    container.addfile(root)
+                    regular = tarfile.TarInfo("moonlightos-support/status.txt")
+                    regular.size = 2
+                    container.addfile(regular, io.BytesIO(b"ok"))
+                    if kind == "link":
+                        unsafe = tarfile.TarInfo("moonlightos-support/link")
+                        unsafe.type = tarfile.SYMTYPE
+                        unsafe.linkname = "/etc/passwd"
+                    elif kind == "traversal":
+                        unsafe = tarfile.TarInfo("moonlightos-support/../outside")
+                        unsafe.size = 1
+                    else:
+                        unsafe = tarfile.TarInfo("moonlightos-support/device")
+                        unsafe.type = tarfile.CHRTYPE
+                    container.addfile(unsafe, io.BytesIO(b"x") if unsafe.isreg() else None)
+                with self.assertRaises(RuntimeError):
+                    exporter.verify_archive(archive)
+
+    def test_archive_rejects_truncated_stream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = self.make_archive(pathlib.Path(directory))
+            data = archive.read_bytes()
+            archive.write_bytes(data[: len(data) // 2])
+            with self.assertRaises((OSError, EOFError, tarfile.TarError)):
+                exporter.verify_archive(archive)
 
     def test_symlink_and_binary_files_are_not_embedded(self):
         secret = b"FAKESECRET-LINKED"
@@ -292,7 +343,7 @@ class ExporterTest(unittest.TestCase):
             self.assertNotIn(secret, (bundle / "linked.txt").read_bytes())
             self.assertNotIn(secret, (bundle / "binary.txt").read_bytes())
 
-    def test_atomic_copy_creates_archive_and_sidecar_only(self):
+    def test_atomic_copy_creates_one_archive_only(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             source_dir = root / "source"
@@ -301,13 +352,8 @@ class ExporterTest(unittest.TestCase):
             target.mkdir()
             archive = self.make_archive(source_dir)
             final = exporter.atomic_export(archive, target, "support.tar.gz")
-            self.assertEqual(
-                sorted(item.name for item in target.iterdir()),
-                ["support.tar.gz", "support.tar.gz.sha256"],
-            )
-            digest, name = (target / "support.tar.gz.sha256").read_text().split()
-            self.assertEqual(name, final.name)
-            self.assertEqual(digest, exporter.file_sha256(final))
+            self.assertEqual(sorted(item.name for item in target.iterdir()), ["support.tar.gz"])
+            self.assertEqual(final.name, "support.tar.gz")
 
     def test_failed_copy_cleans_partial_and_final_files(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -326,6 +372,38 @@ class ExporterTest(unittest.TestCase):
                 with self.assertRaises(OSError):
                     exporter.atomic_export(archive, target, "support.tar.gz")
             self.assertEqual(list(target.iterdir()), [])
+
+    def test_success_status_is_written_after_temporary_unmount(self):
+        destination = support.Destination(
+            "/dev/sdb1", "/run/moonlightos/support-media", "MOONLIGHTOS_SUPPORT",
+            "vfat", True
+        )
+        events = []
+        with mock.patch.object(
+            exporter, "checked_unmount", side_effect=lambda _path: events.append("unmount")
+        ), mock.patch.object(
+            exporter, "write_status", side_effect=lambda *_args: events.append("success")
+        ), mock.patch.object(exporter, "journal_message"):
+            mounted = exporter.finish_export(
+                "request-id", destination, pathlib.Path(destination.mountpoint) / "support.tar.gz", True
+            )
+        self.assertFalse(mounted)
+        self.assertEqual(events, ["unmount", "success"])
+
+    def test_unmount_failure_never_publishes_success(self):
+        destination = support.Destination(
+            "/dev/sdb1", "/run/moonlightos/support-media", "MOONLIGHTOS_SUPPORT",
+            "vfat", True
+        )
+        with mock.patch.object(
+            exporter, "checked_unmount", side_effect=RuntimeError("drive is not safe to remove")
+        ), mock.patch.object(exporter, "write_status") as status:
+            with self.assertRaisesRegex(RuntimeError, "not safe to remove"):
+                exporter.finish_export(
+                    "request-id", destination,
+                    pathlib.Path(destination.mountpoint) / "support.tar.gz", True
+                )
+        status.assert_not_called()
 
 
 if __name__ == "__main__":

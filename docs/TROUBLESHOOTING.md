@@ -13,7 +13,7 @@ Vulkan, VA-API, audio, network, USB/IP, Tailscale, USB, and display-mode data.
 | USB/IP refused | `moonlightos-usbip list`; confirm exact serial and risky-class policy |
 | Tailscale is offline | `moonlightos-tailscale-diagnostics`; local LAN remains usable |
 | Tailscale stream is slow | Check direct/peer-relay/DERP result and approximate latency; reduce bitrate before changing router policy |
-| Saved display mode is not restored | The output, advertised mode, or hashed display identity changed; inspect `/var/log/moonlightos/display.log` |
+| Saved display mode is not restored | The output, advertised mode, or encoded display identity changed; inspect `/var/log/moonlightos/display.log` |
 | Display preview is unusable | Wait 15 seconds or press Escape/controller east; MoonlightOS attempts to restore the previous advertised mode |
 | Support USB is not shown | Use mounted writable removable media, a removable `MOONLIGHTOS_SUPPORT` partition, or writable live persistence; ISO9660 and internal disks are intentionally rejected |
 | Support export fails | `systemctl status moonlightos-support-export.service`; retry after checking free space and write protection |
@@ -24,8 +24,7 @@ internet.
 
 ## USB does not boot
 
-1. Verify the ISO SHA256, then write it to the whole USB device with the `dd`
-   command in `INSTALL.md`.
+1. Write the ISO to the whole USB device with the `dd` command in `INSTALL.md`.
 2. Use Dell `F12` and choose the `UEFI` USB entry. The image requires x86_64
    UEFI and has Secure Boot support enabled.
 3. Wait for the three-second GRUB timeout. The launcher is not allowed to wait
@@ -33,7 +32,7 @@ internet.
 4. If it still stops, capture the exact last message or a photo. Serial boot
    output is available at 115200 8N1 for development builds.
 
-IPv6 is intentionally unavailable in v0.1.2. Use `ip -4 address` and `ip -4
+IPv6 is intentionally unavailable in v0.1.5. Use `ip -4 address` and `ip -4
 route` when troubleshooting networking.
 
 Support export details and verification commands are in

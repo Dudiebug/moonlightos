@@ -175,6 +175,7 @@ unbind_all() {
     [[ -r "$dir/idVendor" ]] || continue
     bound "$dir" && unbind_one "${dir##*/}"
   done
+  return 0
 }
 
 command=${1:-}

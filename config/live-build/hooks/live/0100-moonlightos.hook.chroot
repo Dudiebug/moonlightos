@@ -66,9 +66,9 @@ systemctl enable moonlightos-firewall.service moonlightos-usbipd.service
 systemctl enable moonlightos-usbip-reconcile.path
 systemctl enable moonlightos-moonlight.path moonlightos-chiaki.path moonlightos-firefox.path
 systemctl enable moonlightos-reboot.path moonlightos-poweroff.path
-systemctl enable moonlightos-support-export.path moonlightos-stop-active-app.path
+systemctl enable moonlightos-support-export.path
 systemctl enable moonlightos-audio.service moonlightos-launcher.service \
-  moonlightos-gamepad-nav.service moonlightos-escape-guard.service
+  moonlightos-gamepad-nav.service
 systemctl enable moonlightos-qemu-smoke.service
 systemctl enable tailscaled.service moonlightos-tailscale-enroll.path moonlightos-tailscale-ssh.path
 

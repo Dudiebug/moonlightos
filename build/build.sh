@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORK="$ROOT/build/work"
 OUT="$ROOT/build/out"
-ISO="$OUT/moonlightos-0.1.4-amd64.iso"
+ISO="$OUT/moonlightos-0.1.5-amd64.iso"
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'Run with sudo: sudo make build' >&2; exit 1; }
 command -v lb >/dev/null || { echo 'live-build is required (apt install live-build)' >&2; exit 1; }
@@ -38,5 +38,4 @@ built_iso=$(find . -maxdepth 1 -type f -name '*.hybrid.iso' -print -quit)
   exit 1
 }
 install -m 0644 "$built_iso" "$ISO"
-(cd "$OUT" && sha256sum "$(basename "$ISO")" > "$(basename "$ISO").sha256")
-printf 'ISO: %s\nSHA256: %s.sha256\n' "$ISO" "$ISO"
+printf 'ISO: %s\n' "$ISO"

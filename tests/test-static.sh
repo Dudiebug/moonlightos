@@ -27,11 +27,11 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.4 ]]
+[[ "$(< VERSION)" == 0.1.5 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.4-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.5-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
 rg -q '^  actions: read$' .github/workflows/release-v1.1.yml
-rg -q 'git/matching-refs/tags/v0\.1\.4' .github/workflows/release-v1.1.yml
+rg -q 'git/matching-refs/tags/0\.1\.5' .github/workflows/release-v1.1.yml
 ! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v1.1.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
@@ -55,12 +55,14 @@ rg -q 'binary=/usr/bin/firefox-esr' scripts/moonlightos-run-app
 rg -q 'write_status starting' scripts/moonlightos-run-app
 rg -q 'failed: exited before the application became ready' scripts/moonlightos-run-app
 rg -q 'unsquashfs -quiet -offset' build/configure.sh
-rg -q 'moonlightos-escape-guard' build/configure.sh
-rg -q 'moonlightos-stop-active-app' build/configure.sh
+removed_units='moonlightos-escape''-guard|moonlightos-stop''-active-app'
+! rg -q "$removed_units" build/configure.sh
 rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^wpasupplicant$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wlr-randr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'qrencode -t ANSIUTF8' scripts/moonlightos-tailscale-enrollment
+rg -q "trap 'rm -f --.*URL_FILE.*' EXIT" scripts/moonlightos-tailscale
 ! rg -q 'python3-gi|gir1.2-gtk|libfuse' config/live-build/package-lists/moonlightos.list.chroot
 rg -q 'OVMF_VARS_4M.fd' tests/qemu-smoke.sh
 rg -q 'unit=1,file=' tests/qemu-smoke.sh
@@ -76,26 +78,29 @@ rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'moonlightos-support-export.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
-rg -q 'moonlightos-stop-active-app.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
-rg -q 'moonlightos-escape-guard.service' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+! rg -q "$removed_units" config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q '^PathExists=/run/moonlightos/support-export.request$' services/moonlightos-support-export.path
 rg -q '^ExecStart=/usr/libexec/moonlightos-support-export$' services/moonlightos-support-export.service
-rg -q '^PathExists=/run/moonlightos/stop-active-app$' services/moonlightos-stop-active-app.path
-rg -q '^ExecStart=/usr/libexec/moonlightos-stop-active-app$' services/moonlightos-stop-active-app.service
-rg -q '^ExecStart=/usr/libexec/moonlightos-escape-guard$' services/moonlightos-escape-guard.service
-rg -q 'TRIPLE_TAP_WINDOW = 0\.85' launcher/escape-guard.py
-rg -q 'TRIPLE-TAP ESC IN AN APP TO RETURN' launcher/moonlightos-launcher.py
+removed_feature='TRIPLE[- ]?TAP|triple[- ]?tap|escape''-guard|stop''-active-app'
+! rg -q -g '!tests/test-static.sh' "$removed_feature" launcher scripts services build config docs tests
+rg -q 'EXIT THE APP TO RETURN' launcher/moonlightos-launcher.py
 rg -q 'WILL MOUNT TEMPORARILY' launcher/moonlightos_support.py
 rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale' services/moonlightos-support-export.service
-! rg -q '\bsudo\b' launcher scripts/moonlightos-support-export scripts/moonlightos-stop-active-app services/moonlightos-support-export.service
+! rg -q '\bsudo\b' launcher scripts/moonlightos-support-export services/moonlightos-support-export.service
 rg -q '\["wlr-randr", "--output"' launcher/moonlightos_display.py
 rg -q 'append\("--dryrun"\)' launcher/moonlightos_display.py
 rg -q 'support-export.request' launcher/moonlightos_support.py
-rg -q 'MANIFEST\.sha256' scripts/moonlightos-support-export tests/test_support.py
+! rg -q '\brunuser\b|\bresolvectl\b' scripts/moonlightos-support-export
+rg -q '/usr/bin/setpriv' scripts/moonlightos-support-export tests/test_support.py
+rg -q '^ExecStart=/usr/sbin/usbipd --ipv4$' services/moonlightos-usbipd.service
+! rg -q -- '--foreground' services/moonlightos-usbipd.service
+rg -q 'MOONLIGHTOS_SMOKE_USBIP_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
+digest_pattern='s''ha-?256|s''ha256|\.s''ha256'
+! rg -n -i "$digest_pattern" -g '!.git/**' -g '!tests/test-static.sh' .
 rg -q 'MIN_FREE' scripts/moonlightos-support-export
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_display.py \
-  launcher/moonlightos_support.py launcher/gamepad-nav.py launcher/escape-guard.py \
+  launcher/moonlightos_support.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address scripts/moonlightos-support-export
 
 python3 - <<'PY'
@@ -114,8 +119,8 @@ for lock in ('build/applications.lock', 'build/sources.lock'):
         if not line or line.startswith('#'):
             continue
         fields = line.split('|')
-        assert len(fields) == 5, (lock, line)
-        assert re.fullmatch(r'[0-9a-f]{64}', fields[3]), (lock, line)
+        assert len(fields) == 4, (lock, line)
+        assert fields[2].startswith('https://'), (lock, line)
 
 for workflow in pathlib.Path('.github/workflows').glob('*.yml'):
     lines = workflow.read_text().splitlines()
@@ -157,9 +162,6 @@ for required in \
   services/moonlightos-qemu-smoke.service \
   services/moonlightos-support-export.path \
   services/moonlightos-support-export.service \
-  services/moonlightos-stop-active-app.path \
-  services/moonlightos-stop-active-app.service \
-  services/moonlightos-escape-guard.service \
   services/moonlightos-usbipd.service \
   services/moonlightos-network-ready.service \
   services/moonlightos-tailscale-enroll.service; do
@@ -180,5 +182,9 @@ MOONLIGHTOS_SYSFS_ROOT="$tmp/sys" \
 MOONLIGHTOS_USBIP_ALLOWLIST="$tmp/allowlist" \
 MOONLIGHTOS_USBIP_LOG="$tmp/log/usbip.log" \
   bash usbip/moonlightos-usbip list | grep -q 'allowed'
+MOONLIGHTOS_SYSFS_ROOT="$tmp/sys" \
+MOONLIGHTOS_USBIP_ALLOWLIST="$tmp/allowlist" \
+MOONLIGHTOS_USBIP_LOG="$tmp/log/usbip.log" \
+  bash usbip/moonlightos-usbip unbind-all
 
 printf 'Static tests passed.\n'

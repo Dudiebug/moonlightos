@@ -16,6 +16,23 @@ wait_for_file() {
 }
 
 wait_for_file /run/moonlightos/launcher-ready launcher
+for _ in $(seq 1 250); do
+  if systemctl is-failed --quiet moonlightos-usbipd.service; then
+    systemctl --no-pager --full status moonlightos-usbipd.service >&2 || true
+    echo 'USB/IP daemon failed during QEMU smoke test.' >&2
+    exit 1
+  fi
+  if systemctl is-active --quiet moonlightos-usbipd.service; then
+    echo MOONLIGHTOS_SMOKE_USBIP_READY
+    break
+  fi
+  sleep 0.1
+done
+systemctl is-active --quiet moonlightos-usbipd.service || {
+  systemctl --no-pager --full status moonlightos-usbipd.service >&2 || true
+  echo 'USB/IP daemon did not become active during QEMU smoke test.' >&2
+  exit 1
+}
 systemctl start --no-block moonlightos-moonlight.service
 wait_for_file /run/moonlightos/moonlight-ready Moonlight
 systemctl stop moonlightos-moonlight.service

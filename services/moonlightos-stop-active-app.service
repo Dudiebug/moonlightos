@@ -1,8 +1,0 @@
-[Unit]
-Description=Stop the active MoonlightOS application
-
-[Service]
-Type=oneshot
-ExecStart=/usr/libexec/moonlightos-stop-active-app
-StandardOutput=append:/var/log/moonlightos/escape-guard.log
-StandardError=append:/var/log/moonlightos/escape-guard.log

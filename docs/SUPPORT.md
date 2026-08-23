@@ -22,11 +22,10 @@ internal SATA/NVMe filesystems. It does not format, repartition, run fsck, or
 repair media. The selected device and mount are checked again immediately
 before the archive is copied.
 
-Keep at least 64 MiB free. A successful export creates exactly:
+Keep at least 64 MiB free. A successful export creates exactly one file:
 
 ```text
 moonlightos-support-YYYYMMDD-HHMMSSZ-<machine-id-prefix>.tar.gz
-moonlightos-support-YYYYMMDD-HHMMSSZ-<machine-id-prefix>.tar.gz.sha256
 ```
 
 The screen reports the final path. For a temporarily mounted labeled partition,
@@ -43,10 +42,13 @@ versions, MoonlightOS service status, failed units, the current-boot journal,
 kernel log when permitted, regular text files from `/var/log/moonlightos`, and
 a sanitized copy of `/var/lib/moonlightos/config.ini`.
 
-`MANIFEST.sha256` hashes every collected file. The exporter verifies that
-manifest before copying, copies to a hidden `.partial`, verifies the copied
-archive and its hash, then atomically publishes the archive and checksum.
-Incomplete output is removed on failure.
+The exporter validates every archive member, rejects unsafe paths, links, and
+special files, and fully reads each regular member to detect damaged or
+truncated archives. It copies to a hidden `.partial`, flushes and validates the
+copy, then atomically publishes the archive and syncs the destination.
+Incomplete output is removed on failure. Media mounted by MoonlightOS is
+reported as successful only after a checked unmount; already-mounted media must
+still be safely ejected or unmounted before removal.
 
 ## Privacy boundary
 
@@ -58,12 +60,10 @@ tokens, auth/API tokens, Tailscale keys, and Tailscale enrollment URLs. LAN IP
 addresses and hardware/service failures remain because they are needed for
 diagnosis.
 
-Before sharing an archive, verify it on another system:
+Before sharing an archive, inspect it on another system:
 
 ```bash
-sha256sum --check moonlightos-support-*.tar.gz.sha256
 mkdir extracted-support
 tar -xzf moonlightos-support-*.tar.gz -C extracted-support
-cd extracted-support/moonlightos-support
-sha256sum --check MANIFEST.sha256
+find extracted-support/moonlightos-support -maxdepth 3 -type f -print
 ```

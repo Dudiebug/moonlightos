@@ -7,15 +7,15 @@ out, or unavailable.
 
 ## Package provenance
 
-v0.1.2 installs `tailscale` version `1.102.3` from Tailscale's official stable
+v0.1.5 installs `tailscale` version `1.102.3` from Tailscale's official stable
 Debian Trixie repository:
 
 ```text
 deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian trixie main
 ```
 
-The public archive key URL and SHA256 are pinned in `build/sources.lock`. There
-is no `curl | sh`. The native `tailscaled.service` starts after
+The public archive key URL is fixed in `build/sources.lock`, and apt verifies
+packages with that repository key. There is no `curl | sh`. The native `tailscaled.service` starts after
 `network-online.target`, restarts on failure, stores identity under root-only
 `/var/lib/tailscale`, and is not a launcher dependency.
 

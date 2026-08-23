@@ -2,6 +2,5 @@ build/work/
 build/downloads/
 build/out/
 *.iso
-*.sha256
 __pycache__/
 *.pyc

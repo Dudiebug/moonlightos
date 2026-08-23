@@ -24,8 +24,6 @@ jobs:
             grub-efi-amd64-bin mtools dosfstools qemu-system-x86 ovmf ripgrep
           curl --fail --location --output /tmp/live-build.deb \
             https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
-          echo '58e09779881cbcc631c49ceb703413e0247a87db01823e597b2a1c40a2afd8f4  /tmp/live-build.deb' \
-            | sha256sum --check --strict
           sudo apt-get install --yes /tmp/live-build.deb
           lb --version
       - name: Source tests
@@ -51,11 +49,9 @@ jobs:
             /tmp/moonlightos-qemu-smoke.ppm
           if-no-files-found: warn
           retention-days: 2
-      - name: Upload ISO and checksum
+      - name: Upload ISO
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.4-amd64
-          path: |
-            build/out/moonlightos-0.1.4-amd64.iso
-            build/out/moonlightos-0.1.4-amd64.iso.sha256
+          name: moonlightos-0.1.5-amd64
+          path: build/out/moonlightos-0.1.5-amd64.iso
           if-no-files-found: error

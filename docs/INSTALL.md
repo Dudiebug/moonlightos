@@ -2,18 +2,11 @@
 
 ## Create the USB installer
 
-Verify the image first:
-
-```bash
-cd build/out
-sha256sum --check moonlightos-0.1.2-amd64.iso.sha256
-```
-
 Write the hybrid ISO to a whole USB device. **The selected device is erased.**
 Resolve the exact target with `lsblk` before running this example:
 
 ```bash
-sudo dd if=moonlightos-0.1.2-amd64.iso of=/dev/sdX bs=4M \
+sudo dd if=moonlightos-0.1.5-amd64.iso of=/dev/sdX bs=4M \
   status=progress conv=fsync
 ```
 
@@ -25,7 +18,7 @@ sudo dd if=moonlightos-0.1.2-amd64.iso of=/dev/sdX bs=4M \
 3. Choose `Install` from the boot menu. The image includes Debian Installer in
    live mode; it copies the configured appliance system to the SSD.
 4. Select the 256 GB NVMe only. Guided partitioning with an EFI System
-   Partition and ext4 root is the v0.1.2 reference layout.
+   Partition and ext4 root is the v0.1.5 reference layout.
 5. Reboot, remove the USB, and confirm the MoonlightOS launcher appears.
 6. Run `moonlightos-diagnostics`, pair applications, reboot, and confirm the
    host lists remain.
@@ -36,11 +29,11 @@ even with Ethernet unplugged. Streaming applications wait briefly for IPv4 but
 remain launchable after a DHCP timeout.
 
 If the USB is absent from the `F12` menu, rewrite the ISO directly to the whole
-USB device (not a partition), try another USB port, and verify the checksum.
+USB device (not a partition), and try another USB port.
 Do not use a file-copy operation. If the boot menu appears but the launcher does
-not, photograph the last screen and include it with the ISO checksum in an issue.
+not, photograph the last screen and include it in an issue.
 
-The installed root filesystem is writable in v0.1.2. Pairings, settings, and
+The installed root filesystem is writable in v0.1.5. Pairings, settings, and
 logs live beneath `/var/lib/moonlightos` and `/var/log/moonlightos`.
 
 ## Optional live-USB persistence
