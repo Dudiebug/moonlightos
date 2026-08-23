@@ -102,6 +102,7 @@ done
 rg -q '^d /run/moonlightos 0700 moonlightos moonlightos -$' overlay/etc/tmpfiles.d/moonlightos.conf
 rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-launcher.service
 rg -q '^/usr/bin/wireplumber --profile main-systemwide ' scripts/moonlightos-audio
+rg -q '^PIPEWIRE_DAEMON=true PIPEWIRE_CORE=pipewire-0 /usr/bin/pipewire ' scripts/moonlightos-audio
 rg -q 'moonlightos_bluetooth.py' build/configure.sh
 rg -q 'moonlightos-bluetoothd' build/configure.sh
 for forbidden in 'bluetooth''ctl' 'curses\.endwin' 'terminal_''command' 'SIG''INT' 'kill\(' 'shell=True'; do
