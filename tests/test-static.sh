@@ -113,6 +113,7 @@ rg -q 'MOONLIGHTOS_SMOKE_USBIP_READY' scripts/moonlightos-qemu-smoke tests/qemu-
 rg -q 'MOONLIGHTOS_SMOKE_BLUETOOTH_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'NRestarts' scripts/moonlightos-qemu-smoke
 rg -q 'moonlightos-audio.service' scripts/moonlightos-qemu-smoke
+rg -q '^runuser -u moonlightos -- env XDG_RUNTIME_DIR=/run/moonlightos' scripts/moonlightos-qemu-smoke
 digest_pattern='s''ha-?256|s''ha256|\.s''ha256'
 ! rg -n -i "$digest_pattern" -g '!.git/**' -g '!tests/test-static.sh' .
 rg -q 'MIN_FREE' scripts/moonlightos-support-export

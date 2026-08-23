@@ -61,7 +61,8 @@ test "$launcher_pid" = "$(systemctl show --property=MainPID --value moonlightos-
 test "$launcher_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-launcher.service)"
 test "$audio_pid" = "$(systemctl show --property=MainPID --value moonlightos-audio.service)"
 test "$audio_restarts" = "$(systemctl show --property=NRestarts --value moonlightos-audio.service)"
-XDG_RUNTIME_DIR=/run/moonlightos wpctl status > /tmp/moonlightos-audio-smoke.txt 2>&1 || {
+runuser -u moonlightos -- env XDG_RUNTIME_DIR=/run/moonlightos \
+  wpctl status > /tmp/moonlightos-audio-smoke.txt 2>&1 || {
   systemctl --no-pager --full status moonlightos-audio.service >&2 || true
   cat /var/log/moonlightos/audio.log >&2 || true
   cat /tmp/moonlightos-audio-smoke.txt >&2 || true
