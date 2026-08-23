@@ -10,6 +10,7 @@ User=moonlightos
 Group=moonlightos
 Environment=HOME=/var/lib/moonlightos/home
 Environment=XDG_RUNTIME_DIR=/run/moonlightos
+Environment=PIPEWIRE_RUNTIME_DIR=/run/moonlightos
 RuntimeDirectory=moonlightos-bluetooth
 RuntimeDirectoryMode=0700
 ExecStart=/usr/libexec/moonlightos-bluetoothd

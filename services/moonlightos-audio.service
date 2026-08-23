@@ -11,6 +11,7 @@ SupplementaryGroups=audio
 Environment=HOME=/var/lib/moonlightos/home
 Environment=XDG_CONFIG_HOME=/var/lib/moonlightos/home/.config
 Environment=XDG_RUNTIME_DIR=/run/moonlightos
+Environment=PIPEWIRE_RUNTIME_DIR=/run/moonlightos
 ExecStart=/usr/libexec/moonlightos-audio
 Restart=on-failure
 RestartSec=2

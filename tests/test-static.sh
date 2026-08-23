@@ -96,6 +96,9 @@ rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-bluetooth.service
 rg -q '^User=moonlightos$' services/moonlightos-bluetooth.service
 rg -q '^ExecStart=/usr/libexec/moonlightos-bluetoothd$' services/moonlightos-bluetooth.service
 rg -q '^After=.*dbus.service.*bluetooth.service$' services/moonlightos-audio.service
+for unit in audio bluetooth moonlight chiaki firefox; do
+  rg -q '^Environment=PIPEWIRE_RUNTIME_DIR=/run/moonlightos$' "services/moonlightos-$unit.service"
+done
 rg -q '^d /run/moonlightos 0700 moonlightos moonlightos -$' overlay/etc/tmpfiles.d/moonlightos.conf
 rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-launcher.service
 rg -q '^/usr/bin/wireplumber --profile main-systemwide ' scripts/moonlightos-audio
