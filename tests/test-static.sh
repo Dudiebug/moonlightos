@@ -96,6 +96,9 @@ rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-bluetooth.service
 rg -q '^User=moonlightos$' services/moonlightos-bluetooth.service
 rg -q '^ExecStart=/usr/libexec/moonlightos-bluetoothd$' services/moonlightos-bluetooth.service
 rg -q '^After=.*dbus.service.*bluetooth.service$' services/moonlightos-audio.service
+rg -q '^d /run/moonlightos 0700 moonlightos moonlightos -$' overlay/etc/tmpfiles.d/moonlightos.conf
+rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-launcher.service
+rg -q '^/usr/bin/wireplumber --profile main-systemwide ' scripts/moonlightos-audio
 rg -q 'moonlightos_bluetooth.py' build/configure.sh
 rg -q 'moonlightos-bluetoothd' build/configure.sh
 for forbidden in 'bluetooth''ctl' 'curses\.endwin' 'terminal_''command' 'SIG''INT' 'kill\(' 'shell=True'; do

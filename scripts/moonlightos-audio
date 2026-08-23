@@ -12,5 +12,5 @@ trap cleanup EXIT INT TERM
 
 /usr/bin/pipewire & pids+=("$!")
 /usr/bin/pipewire-pulse & pids+=("$!")
-/usr/bin/wireplumber & pids+=("$!")
+/usr/bin/wireplumber --profile main-systemwide & pids+=("$!")
 wait -n "${pids[@]}"

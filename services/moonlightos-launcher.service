@@ -20,7 +20,7 @@ Environment=XDG_RUNTIME_DIR=/run/moonlightos
 Environment=LIBSEAT_BACKEND=seatd
 Environment=QT_QPA_PLATFORM=wayland
 RuntimeDirectory=moonlightos
-RuntimeDirectoryMode=0750
+RuntimeDirectoryMode=0700
 StateDirectory=moonlightos
 LogsDirectory=moonlightos
 ExecStartPre=/usr/bin/rm -f /run/moonlightos/launcher-ready /run/moonlightos/session.env

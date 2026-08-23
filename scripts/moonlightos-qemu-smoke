@@ -64,6 +64,7 @@ test "$audio_restarts" = "$(systemctl show --property=NRestarts --value moonligh
 runuser -u moonlightos -- env XDG_RUNTIME_DIR=/run/moonlightos \
   wpctl status > /tmp/moonlightos-audio-smoke.txt 2>&1 || {
   systemctl --no-pager --full status moonlightos-audio.service >&2 || true
+  find /run/moonlightos -maxdepth 1 -ls >&2 || true
   cat /var/log/moonlightos/audio.log >&2 || true
   cat /tmp/moonlightos-audio-smoke.txt >&2 || true
   echo 'PipeWire did not remain ready after Bluetooth service restarts.' >&2
