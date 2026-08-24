@@ -23,10 +23,16 @@ install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
 
 install -D -m 0755 "$ROOT/launcher/moonlightos-launcher.py" "$CHROOT/usr/libexec/moonlightos-launcher"
 install -D -m 0755 "$ROOT/launcher/gamepad-nav.py" "$CHROOT/usr/libexec/moonlightos-gamepad-nav"
+install -D -m 0644 "$ROOT/launcher/moonlightos_apps.py" "$CHROOT/usr/libexec/moonlightos_apps.py"
+install -D -m 0755 "$ROOT/launcher/moonlightos_app_runner.py" "$CHROOT/usr/libexec/moonlightos-run-configured-app"
+install -D -m 0644 "$ROOT/launcher/moonlightos_setup.py" "$CHROOT/usr/libexec/moonlightos_setup.py"
+install -D -m 0755 "$ROOT/launcher/moonlightos_osk.py" "$CHROOT/usr/libexec/moonlightos-osk"
 install -D -m 0644 "$ROOT/launcher/moonlightos_display.py" "$CHROOT/usr/libexec/moonlightos_display.py"
 install -D -m 0644 "$ROOT/launcher/moonlightos_support.py" "$CHROOT/usr/libexec/moonlightos_support.py"
 install -D -m 0644 "$ROOT/launcher/moonlightos_bluetooth.py" "$CHROOT/usr/libexec/moonlightos_bluetooth.py"
 install -D -m 0755 "$ROOT/scripts/moonlightos-bluetoothd" "$CHROOT/usr/libexec/moonlightos-bluetoothd"
+install -D -m 0755 "$ROOT/scripts/moonlightos-osk-session" "$CHROOT/usr/libexec/moonlightos-osk-session"
+install -D -m 0755 "$ROOT/scripts/moonlightos-tailscale-ui" "$CHROOT/usr/bin/moonlightos-tailscale-ui"
 install -D -m 0755 "$ROOT/scripts/moonlightos-run-app" "$CHROOT/usr/libexec/moonlightos-run-app"
 install -D -m 0755 "$ROOT/scripts/moonlightos-qemu-smoke" "$CHROOT/usr/libexec/moonlightos-qemu-smoke"
 install -D -m 0755 "$ROOT/scripts/moonlightos-support-export" "$CHROOT/usr/libexec/moonlightos-support-export"
@@ -46,6 +52,11 @@ install -D -m 0644 "$ROOT/build/applications.lock" \
   "$CHROOT/usr/share/moonlightos/applications.lock"
 install -D -m 0644 "$ROOT/build/sources.lock" \
   "$CHROOT/usr/share/moonlightos/sources.lock"
+for manifest in "$ROOT"/config/apps.d/*.ini; do
+  install -D -m 0644 "$manifest" "$CHROOT/usr/share/moonlightos/apps.d/$(basename "$manifest")"
+done
+install -D -m 0644 "$ROOT/docs/examples/steam.ini" \
+  "$CHROOT/usr/share/doc/moonlightos/examples/steam.ini"
 build_commit=$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf unknown)
 build_state=clean
 git -C "$ROOT" status --porcelain --untracked-files=normal 2>/dev/null | grep -q . && build_state=modified

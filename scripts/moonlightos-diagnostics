@@ -62,6 +62,9 @@ report() {
     sed 's/^/  /' "$base/modes" 2>/dev/null || true
   done
   echo
+  echo '== Applications (sanitized) =='
+  /usr/bin/python3 /usr/libexec/moonlightos_apps.py 2>&1 || true
+  echo
   echo '== Services =='
   systemctl --no-pager --plain --state=failed 2>&1 || true
 }

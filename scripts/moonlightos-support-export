@@ -323,6 +323,11 @@ def collect(bundle: pathlib.Path) -> None:
     )
     add_command(
         bundle,
+        "software/applications-sanitized.txt",
+        ["/usr/bin/python3", "/usr/libexec/moonlightos_apps.py"],
+    )
+    add_command(
+        bundle,
         "services/moonlightos-services.txt",
         ["systemctl", "--no-pager", "--full", "status", "moonlightos-*"],
     )

@@ -152,7 +152,8 @@ class BluetoothController:
         self.operation_number = 0
         self.operations: collections.OrderedDict[str, dict[str, object]] = collections.OrderedDict()
         self.active_by_device: dict[str, str] = {}
-        self.scan_timer: int | None = None
+        self.scan_starting = False
+        self.discovery_requested = False
 
     def start(self, agent_class: type) -> None:
         self.agent = agent_class(self.bus, AGENT_PATH, self)
@@ -249,6 +250,13 @@ class BluetoothController:
             properties.update(converted)
         for name in plain(invalidated) or []:
             properties.pop(str(name), None)
+        if (
+            interface_text == ADAPTER
+            and self.discovery_requested
+            and bool(properties.get("Powered"))
+            and not bool(properties.get("Discovering"))
+        ):
+            self._begin_discovery(path_text)
 
     def _record_error(self, prefix: str, error: object) -> None:
         detail = safe_text(error, 120)
@@ -449,6 +457,17 @@ class BluetoothController:
         return {"ok": True, "accepted": True}
 
     def _begin_discovery(self, adapter_path: str) -> None:
+        adapter = self.adapter()
+        if self.scan_starting or (adapter and bool(adapter[1].get("Discovering"))):
+            return
+        self.scan_starting = True
+
+        def failed(error: object) -> None:
+            self.scan_starting = False
+            if bluez_error_name(error).endswith("InProgress"):
+                return
+            self._record_error("BLUETOOTH SCAN FAILED", error)
+
         def start() -> None:
             self._call(
                 adapter_path,
@@ -456,7 +475,7 @@ class BluetoothController:
                 "StartDiscovery",
                 (),
                 self._scan_started,
-                lambda error: self._record_error("BLUETOOTH SCAN FAILED", error),
+                failed,
                 4,
             )
 
@@ -471,20 +490,21 @@ class BluetoothController:
         )
 
     def _scan_started(self) -> None:
-        if self.scan_timer is not None:
-            self.glib.source_remove(self.scan_timer)
-        self.scan_timer = self.glib.timeout_add_seconds(15, self._scan_expired)
-
-    def _scan_expired(self) -> bool:
-        self.scan_timer = None
-        self.stop_scan()
-        return False
+        self.scan_starting = False
+        if not self.discovery_requested:
+            adapter = self.adapter()
+            if adapter:
+                self._call(
+                    adapter[0], ADAPTER, "StopDiscovery", (), lambda: None,
+                    lambda error: self._record_error("COULD NOT STOP BLUETOOTH SCAN", error), 3,
+                )
 
     def start_scan(self) -> dict[str, object]:
         adapter_path, properties = self._require_adapter()
-        if bool(properties.get("Powered")):
+        self.discovery_requested = True
+        if bool(properties.get("Powered")) and not bool(properties.get("Discovering")):
             self._begin_discovery(adapter_path)
-        else:
+        elif not bool(properties.get("Powered")):
             self._set_property(
                 adapter_path,
                 ADAPTER,
@@ -496,12 +516,8 @@ class BluetoothController:
         return {"ok": True, "accepted": True}
 
     def stop_scan(self) -> dict[str, object]:
-        if self.scan_timer is not None:
-            try:
-                self.glib.source_remove(self.scan_timer)
-            except Exception:
-                pass
-            self.scan_timer = None
+        self.discovery_requested = False
+        self.scan_starting = False
         adapter = self.adapter()
         if adapter and bool(adapter[1].get("Discovering")):
             self._call(

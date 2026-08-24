@@ -8,6 +8,11 @@
   Debian packages remain a future goal.
 - 4K60 SDR is best effort. HDR is unverified and unsupported for acceptance.
 - The installed root filesystem is writable; A/B read-only updates are deferred.
+- Steam is not installed. `steam-devices` supplies controller device rules only;
+  the documented Steam manifest is groundwork for a future supported install.
+- The controller keyboard is a full-screen buffered utility, not a compositor overlay.
+  Physical controller and text-injection validation remains required.
+- Custom command applications must already exist on the filesystem.
 - Bluetooth depends on kernel and firmware support for the installed adapter.
   QEMU verifies only clean no-adapter behavior; no physical Bluetooth result is
   claimed. MoonlightOS provides no desktop Bluetooth application.

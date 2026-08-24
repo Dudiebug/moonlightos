@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import curses
+import dataclasses
 import ipaddress
 import os
 import pathlib
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -16,26 +18,17 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import moonlightos_display as display
 import moonlightos_support as support
 import moonlightos_bluetooth as bluetooth
+import moonlightos_apps as apps
+import moonlightos_setup as setup
 
 
 RUN = pathlib.Path("/run/moonlightos")
-MENU = (
-    ("MOONLIGHT", "moonlight"),
-    ("CHIAKI-NG", "chiaki"),
-    ("FIREFOX", "firefox"),
-    ("TAILSCALE", "tailscale"),
-    ("SETTINGS", "settings"),
-    ("REBOOT", "reboot"),
-    ("SHUTDOWN", "poweroff"),
-)
-APP_LAUNCH = {
-    "moonlight": ("MOONLIGHT", "moonlight", "start-moonlight"),
-    "chiaki": ("CHIAKI-NG", "chiaki-ng", "start-chiaki"),
-    "firefox": ("FIREFOX", "firefox", "start-firefox"),
-}
-GAP_BEFORE = {4, 5}
+SOURCE_MANIFESTS = pathlib.Path(__file__).resolve().parents[1] / "config/apps.d"
+FIXED_CONTROLS = (("SETTINGS", "settings"), ("REBOOT", "reboot"), ("SHUTDOWN", "poweroff"))
 SETTINGS_MENU = (
     "BLUETOOTH",
+    "APPLICATIONS",
+    "SETUP WIZARD",
     "RESOLUTION",
     "REFRESH RATE",
     "APPLY DISPLAY MODE",
@@ -47,6 +40,23 @@ SPINNER = "|/-\\"
 SUPPORT_EXPORT_TIMEOUT = 180.0
 SUPPORT_EXPORT_START_TIMEOUT = 12.0
 SUPPORT_EXPORT_POLL_MS = 100
+
+
+def application_result() -> apps.LoadResult:
+    system_dir = apps.SYSTEM_DIR if apps.SYSTEM_DIR.exists() else SOURCE_MANIFESTS
+    return apps.load_applications(system_dir=system_dir)
+
+
+def request_osk() -> None:
+    (RUN / "start-osk").touch()
+
+
+def read_key(screen: curses.window) -> int:
+    key = screen.getch()
+    if key == curses.KEY_F12:
+        request_osk()
+        return -1
+    return key
 
 
 def move_selection(selected: int, key: int, count: int) -> int:
@@ -123,6 +133,66 @@ def network_summary() -> str:
     return f"{address}  {state}"
 
 
+def bluetooth_summary() -> str:
+    try:
+        adapter = bluetooth.BluetoothClient().snapshot().get("adapter")
+    except bluetooth.BluetoothError:
+        return "BLUETOOTH STATUS UNAVAILABLE"
+    if not isinstance(adapter, dict):
+        return "NO BLUETOOTH ADAPTER"
+    return "BLUETOOTH ON" if adapter.get("powered") else "BLUETOOTH OFF"
+
+
+def display_summary() -> str:
+    try:
+        output = display.active_output(display.query_outputs())
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return "DISPLAY STATUS UNAVAILABLE"
+    if output is None or output.current_mode is None:
+        return "NO ACTIVE DISPLAY"
+    return f"{output.name}  {output.current_mode.argument}"
+
+
+def audio_summary() -> str:
+    try:
+        result = subprocess.run(
+            ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+            text=True, capture_output=True, check=False, timeout=3,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "AUDIO STATUS UNAVAILABLE"
+    return result.stdout.strip().upper()[:96] if result.returncode == 0 else "AUDIO STATUS UNAVAILABLE"
+
+
+def controller_summary() -> str:
+    identity = pathlib.Path("/var/lib/moonlightos/launcher-controller.id")
+    try:
+        value = identity.read_text(encoding="ascii").strip()
+    except OSError:
+        return "NO CONTROLLER IDENTITY SAVED"
+    return f"CONTROLLER DETECTED  {value[:64]}"
+
+
+def configuration_summary(name: str) -> str:
+    root = pathlib.Path("/var/lib/moonlightos/home/.config")
+    try:
+        configured = any(name in path.name.casefold() for path in root.iterdir())
+    except OSError:
+        configured = False
+    return f"{name.upper()} {'CONFIGURATION FOUND' if configured else 'NOT CONFIGURED'}"
+
+
+def tailscale_summary() -> str:
+    try:
+        result = subprocess.run(
+            ["tailscale", "status", "--json"], text=True, capture_output=True,
+            check=False, timeout=3,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "TAILSCALE DISCONNECTED"
+    return "TAILSCALE CONNECTED" if result.returncode == 0 else "TAILSCALE DISCONNECTED"
+
+
 def add_centered(screen: curses.window, row: int, text: str) -> None:
     height, width = screen.getmaxyx()
     if not 0 <= row < height or width < 2:
@@ -154,6 +224,19 @@ class Launcher:
         self.selected = 0
         self.status = network_summary()
         self.last_status_update = time.monotonic()
+        self.applications: tuple[apps.Application, ...] = ()
+        self.menu: list[tuple[str, str]] = []
+        self.reload_applications()
+
+    def reload_applications(self) -> None:
+        result = application_result()
+        self.applications = tuple(
+            app for app in result.applications if app.visible and app.enabled
+        )
+        self.menu = [(app.name, app.id) for app in self.applications] + list(FIXED_CONTROLS)
+        self.selected = min(self.selected, max(0, len(self.menu) - 1))
+        if result.errors:
+            self.status = f"{len(result.errors)} INVALID APPLICATION(S) SKIPPED"
 
     def prepare_session(self) -> None:
         RUN.mkdir(mode=0o750, parents=True, exist_ok=True)
@@ -178,8 +261,9 @@ class Launcher:
 
         rows = []
         row = max(title_row + 3, height // 3)
-        for index, (label, _action) in enumerate(MENU):
-            if index in GAP_BEFORE:
+        gap_before = {len(self.applications), len(self.applications) + 1}
+        for index, (label, _action) in enumerate(self.menu):
+            if index in gap_before:
                 row += 1
             rows.append((row, label))
             row += 1
@@ -224,7 +308,7 @@ class Launcher:
                 add_centered(self.screen, first + offset, row)
             add_centered(self.screen, height - 3, "ENTER OR ESC RETURNS TO LAUNCHER")
             self.screen.refresh()
-            if self.screen.getch() in (curses.KEY_ENTER, 10, 13, 27):
+            if read_key(self.screen) in (curses.KEY_ENTER, 10, 13, 27):
                 return
 
     @staticmethod
@@ -238,13 +322,16 @@ class Launcher:
             return ""
         return lines[0][:240] if lines else ""
 
-    def launch_app(self, action: str) -> bool:
-        label, app_id, request = APP_LAUNCH[action]
+    def launch_app(self, app: apps.Application) -> bool:
+        label, app_id = app.name, app.status_id
         ready = RUN / f"{app_id}-ready"
         state = RUN / f"{app_id}-status"
         ready.unlink(missing_ok=True)
         state.unlink(missing_ok=True)
-        self.request(request)
+        if app.kind == "request":
+            self.request(app.request)
+        else:
+            apps.atomic_write(RUN / "launch-app.request", app.id + "\n")
 
         deadline = time.monotonic() + 18
         failure_since: float | None = None
@@ -271,7 +358,7 @@ class Launcher:
                         return False
                 else:
                     failure_since = None
-                self.screen.getch()  # permits curses to process resize/input state
+                read_key(self.screen)  # permits curses to process resize/input state
         finally:
             self.screen.timeout(1000)
 
@@ -285,79 +372,56 @@ class Launcher:
         self.status = f"{label} START TIMED OUT"
         return False
 
-    def restore_curses(self) -> None:
-        try:
-            curses.reset_prog_mode()
-        except curses.error:
-            pass
-        for operation in (curses.noecho, curses.cbreak):
-            try:
-                operation()
-            except curses.error:
-                pass
-        try:
-            curses.curs_set(0)
-        except curses.error:
-            pass
-        try:
-            curses.flushinp()
-        except curses.error:
-            pass
-        self.screen.keypad(True)
-        self.screen.timeout(1000)
-        try:
-            self.screen.clearok(True)
-        except curses.error:
-            pass
-        self.screen.clear()
-        self.screen.refresh()
+    def app_by_id(self, app_id: str) -> apps.Application | None:
+        return next(
+            (app for app in application_result().applications if app.id == app_id and app.enabled),
+            None,
+        )
 
-    def terminal_command(self, command: list[str], wait_message: str | None = None) -> int:
-        curses.def_prog_mode()
-        curses.endwin()
-        try:
-            try:
-                result = subprocess.run(command, check=False)
-            except KeyboardInterrupt:
-                return 130
-            if wait_message:
-                print()
-                print(wait_message)
-                try:
-                    input()
-                except KeyboardInterrupt:
-                    return 130
-            return result.returncode
-        finally:
-            self.restore_curses()
+    def launch_by_id(self, app_id: str) -> bool:
+        app = self.app_by_id(app_id)
+        if app is None:
+            self.status = f"{app_id.upper()} IS UNAVAILABLE"
+            return False
+        return self.launch_app(app)
 
     def activate(self) -> None:
-        _label, action = MENU[self.selected]
-        if action in APP_LAUNCH:
-            self.launch_app(action)
-        elif action == "tailscale":
-            auth_url = RUN / "tailscale-auth-url"
-            try:
-                if auth_url.lstat().st_uid == os.getuid():
-                    auth_url.unlink()
-            except FileNotFoundError:
-                pass
-            self.request("tailscale-enroll")
-            result = self.terminal_command(["moonlightos-tailscale-enrollment"])
-            # Rebuild runtime state after the external terminal UI. This avoids
-            # the broken input/app-launch state seen after enrollment returns.
-            self.prepare_session()
-            if result == 0:
-                self.status = "TAILSCALE CONNECTED"
-            elif result in {130, 143}:
-                self.status = "TAILSCALE SETUP CLOSED"
-            else:
-                self.status = "TAILSCALE SETUP FAILED"
-            self.last_status_update = time.monotonic()
+        _label, action = self.menu[self.selected]
+        app = next((item for item in self.applications if item.id == action), None)
+        if app:
+            self.launch_app(app)
         elif action == "settings":
-            Settings(self.screen, self.terminal_command).run()
+            Settings(self.screen, self).run()
+            self.reload_applications()
         elif action in {"reboot", "poweroff"}:
             self.request(action)
+
+    def setup_wizard(self, *, force: bool = False) -> None:
+        settings = Settings(self.screen, self)
+        actions = {
+            "osk": request_osk,
+            "network": lambda: self.launch_by_id("network-setup"),
+            "bluetooth": lambda: bluetooth.run_bluetooth(self.screen),
+            "display": settings.run_display,
+            "audio": lambda: self.launch_by_id("audio-test"),
+            "moonlight": lambda: self.launch_by_id("moonlight"),
+            "chiaki-ng": lambda: self.launch_by_id("chiaki-ng"),
+            "tailscale": lambda: self.launch_by_id("tailscale"),
+            "applications": settings.run_applications,
+        }
+        statuses = {
+            "network": network_summary,
+            "bluetooth": bluetooth_summary,
+            "display": display_summary,
+            "audio": audio_summary,
+            "controller": controller_summary,
+            "moonlight": lambda: configuration_summary("moonlight"),
+            "chiaki-ng": lambda: configuration_summary("chiaki"),
+            "tailscale": tailscale_summary,
+            "applications": lambda: f"{len(application_result().applications)} APPLICATIONS CONFIGURED",
+        }
+        setup.SetupWizard(self.screen, actions, statuses).run(force=force)
+        self.reload_applications()
 
     def run(self) -> None:
         self.prepare_session()
@@ -373,9 +437,10 @@ class Launcher:
         (RUN / "launcher-ready").touch()
         display.restore_saved_mode()
         self.draw()
+        self.setup_wizard()
         while True:
-            key = self.screen.getch()
-            self.selected = move_selection(self.selected, key, len(MENU))
+            key = read_key(self.screen)
+            self.selected = move_selection(self.selected, key, len(self.menu))
             if key in (curses.KEY_ENTER, 10, 13):
                 self.activate()
             elif key == curses.KEY_RESIZE:
@@ -389,9 +454,9 @@ class Launcher:
 
 
 class Settings:
-    def __init__(self, screen: curses.window, terminal_command) -> None:
+    def __init__(self, screen: curses.window, launcher: Launcher) -> None:
         self.screen = screen
-        self.terminal_command = terminal_command
+        self.launcher = launcher
         self.selected = 0
         self.status = ""
         self.output: display.Output | None = None
@@ -445,6 +510,8 @@ class Settings:
             resolution = self.resolution or "UNAVAILABLE"
             rows = [
                 "BLUETOOTH",
+                "APPLICATIONS",
+                "SETUP WIZARD",
                 f"RESOLUTION                 {resolution}",
                 f"REFRESH RATE               {refresh}",
                 "APPLY DISPLAY MODE",
@@ -473,7 +540,7 @@ class Settings:
         selected = next((index for index, item in enumerate(choices) if item[1] == current), 0)
         while True:
             self.draw(title, [label for label, _value in choices], selected)
-            key = self.screen.getch()
+            key = read_key(self.screen)
             selected = move_selection(selected, key, len(choices))
             if key in (curses.KEY_ENTER, 10, 13):
                 return choices[selected][1]
@@ -486,7 +553,7 @@ class Settings:
             rows = textwrap.wrap(message, width=max(8, width - 8)) or [""]
             self.status = "ENTER OR ESC RETURNS TO SETTINGS"
             self.draw(title, rows, None)
-            if self.screen.getch() in (curses.KEY_ENTER, 10, 13, 27):
+            if read_key(self.screen) in (curses.KEY_ENTER, 10, 13, 27):
                 return
 
     def draw_support_progress(
@@ -582,7 +649,7 @@ class Settings:
             seconds = max(1, int(deadline - time.monotonic() + 0.999))
             self.status = f"ENTER CONFIRMS; ESC ROLLS BACK ({seconds}S)"
             self.draw("CONFIRM DISPLAY MODE", [requested.argument], 0)
-            key = self.screen.getch()
+            key = read_key(self.screen)
             if key in (curses.KEY_ENTER, 10, 13):
                 confirmed = True
                 break
@@ -698,7 +765,7 @@ class Settings:
 
                 self.draw_support_progress(destination, frame, message, now - started_at)
                 frame += 1
-                self.screen.getch()  # process resize/input state; export cannot be cancelled safely
+                read_key(self.screen)  # process resize/input state; export cannot be cancelled safely
         finally:
             self.screen.timeout(1000)
 
@@ -706,6 +773,10 @@ class Settings:
         if self.selected == 0:
             bluetooth.run_bluetooth(self.screen)
         elif self.selected == 1:
+            self.run_applications()
+        elif self.selected == 2:
+            self.launcher.setup_wizard(force=True)
+        elif self.selected == 3:
             resolutions = self.resolutions()
             chosen = self.choose("RESOLUTION", [(item, item) for item in resolutions], self.resolution)
             if isinstance(chosen, str):
@@ -713,7 +784,7 @@ class Settings:
                 rates = self.refresh_rates()
                 if self.refresh_mhz not in rates and rates:
                     self.refresh_mhz = rates[0]
-        elif self.selected == 2:
+        elif self.selected == 4:
             rates = self.refresh_rates()
             choices = [
                 (f"{value / 1000:g} HZ", value)
@@ -722,27 +793,253 @@ class Settings:
             chosen = self.choose("REFRESH RATE", choices, self.refresh_mhz)
             if isinstance(chosen, int):
                 self.refresh_mhz = chosen
-        elif self.selected == 3:
-            self.apply_preview()
-        elif self.selected == 4:
-            self.generate_support_file()
         elif self.selected == 5:
-            self.terminal_command(
-                ["moonlightos-diagnostics"], "Press ENTER to return to Settings."
-            )
+            self.apply_preview()
+        elif self.selected == 6:
+            self.generate_support_file()
+        elif self.selected == 7:
+            self.launcher.launch_by_id("system-diagnostics")
         else:
             return False
         return True
+
+    def run_display(self) -> None:
+        self.refresh_outputs()
+        selected = 0
+        while True:
+            refresh = f"{self.refresh_mhz / 1000:g} HZ" if self.refresh_mhz else "UNAVAILABLE"
+            rows = [f"RESOLUTION  {self.resolution or 'UNAVAILABLE'}", f"REFRESH RATE  {refresh}", "APPLY DISPLAY MODE", "BACK"]
+            self.draw("DISPLAY SETTINGS", rows, selected)
+            key = read_key(self.screen)
+            selected = move_selection(selected, key, len(rows))
+            if key == 27 or (key in (curses.KEY_ENTER, 10, 13) and selected == 3):
+                return
+            if key not in (curses.KEY_ENTER, 10, 13):
+                continue
+            old = self.selected
+            self.selected = selected + 3
+            self.activate()
+            self.selected = old
+
+    def run_applications(self) -> None:
+        ApplicationsSettings(self.screen, self.launcher).run()
+        self.launcher.reload_applications()
 
     def run(self) -> None:
         self.refresh_outputs()
         while True:
             self.draw()
-            key = self.screen.getch()
+            key = read_key(self.screen)
             self.selected = move_selection(self.selected, key, len(SETTINGS_MENU))
             if key in (curses.KEY_ENTER, 10, 13) and not self.activate():
                 return
             if key == 27:
+                return
+
+
+class ApplicationsSettings:
+    def __init__(self, screen: curses.window, launcher: Launcher) -> None:
+        self.screen = screen
+        self.launcher = launcher
+        self.selected = 0
+        self.status = ""
+
+    def result(self) -> apps.LoadResult:
+        return application_result()
+
+    def draw(self, title: str, rows: list[str], selected: int | None = None) -> None:
+        self.screen.erase()
+        height, width = self.screen.getmaxyx()
+        draw_border(self.screen)
+        add_centered(self.screen, max(2, height // 8), title)
+        first = max(5, height // 4)
+        left = max(2, (width - max((len(row) for row in rows), default=1) - 3) // 2)
+        count = max(1, height - first - 4)
+        offset = 0 if selected is None else min(max(0, selected - count + 1), max(0, len(rows) - count))
+        for index, row in enumerate(rows[offset:offset + count], start=offset):
+            marker = ">" if index == selected else " "
+            try:
+                self.screen.addnstr(first + index - offset, left, f"{marker}  {row}", max(1, width - left - 1))
+            except curses.error:
+                pass
+        add_centered(self.screen, height - 3, self.status or "F12 OPENS THE KEYBOARD")
+        self.screen.refresh()
+
+    def text_input(self, title: str, prompt: str, limit: int) -> str | None:
+        value = ""
+        self.screen.timeout(-1)
+        try:
+            curses.curs_set(1)
+        except curses.error:
+            pass
+        try:
+            while True:
+                shown = value[-limit:] or "_"
+                self.draw(title, [prompt, shown], None)
+                key = self.screen.get_wch()
+                if isinstance(key, str):
+                    if key in {"\n", "\r"}:
+                        return value
+                    if key == "\x1b":
+                        return None
+                    if key in {"\b", "\x7f"}:
+                        value = value[:-1]
+                    elif key.isprintable() and key not in "\r\n" and len(value) < limit:
+                        value += key
+                elif key == curses.KEY_F12:
+                    request_osk()
+                elif key in (curses.KEY_BACKSPACE,):
+                    value = value[:-1]
+        finally:
+            self.screen.timeout(1000)
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+
+    def yes_no(self, title: str, prompt: str) -> bool | None:
+        selected = 0
+        while True:
+            rows = [prompt, "YES", "NO"]
+            self.draw(title, rows, selected + 1)
+            key = read_key(self.screen)
+            selected = move_selection(selected, key, 2)
+            if key in (curses.KEY_ENTER, 10, 13):
+                return selected == 0
+            if key == 27:
+                return None
+
+    def _write_user(self, app: apps.Application) -> None:
+        system_dir = apps.SYSTEM_DIR if apps.SYSTEM_DIR.exists() else SOURCE_MANIFESTS
+        apps.write_user_application(app, system_dir=system_dir)
+
+    def add_command(self) -> None:
+        name = self.text_input("ADD COMMAND APPLICATION", "NAME", apps.MAX_NAME)
+        if not name:
+            return
+        command = self.text_input("ADD COMMAND APPLICATION", "ABSOLUTE COMMAND", apps.MAX_COMMAND)
+        if command is None:
+            return
+        arguments = self.text_input("ADD COMMAND APPLICATION", "ARGUMENTS (OPTIONAL)", apps.MAX_ARGUMENTS)
+        if arguments is None:
+            return
+        terminal = self.yes_no("ADD COMMAND APPLICATION", "RUN IN TERMINAL?")
+        if terminal is None:
+            return
+        environment_text = self.text_input(
+            "ADD COMMAND APPLICATION", "ENVIRONMENT KEY=value;OTHER=value (OPTIONAL)", 2048
+        )
+        if environment_text is None:
+            return
+        try:
+            result = self.result()
+            app_id = apps.application_id(name, {item.id for item in result.applications})
+            order = max([50, *(item.order for item in result.applications if item.visible)]) + 10
+            self._write_user(
+                apps.Application(
+                    id=app_id, name=name.strip().upper(), kind="command", command=command.strip(),
+                    arguments=arguments, status_id=app_id, terminal=terminal, order=order,
+                    environment=apps.parse_environment(environment_text),
+                )
+            )
+            self.status = f"ADDED {name.strip().upper()}"
+        except (OSError, apps.ManifestError) as error:
+            self.status = f"APPLICATION NOT ADDED: {error}"
+
+    def add_web(self) -> None:
+        name = self.text_input("ADD WEB APPLICATION", "NAME", apps.MAX_NAME)
+        if not name:
+            return
+        url = self.text_input("ADD WEB APPLICATION", "HTTP:// OR HTTPS:// URL", 2048)
+        if url is None:
+            return
+        try:
+            url = apps.validate_web_url(url)
+            result = self.result()
+            app_id = apps.application_id(name, {item.id for item in result.applications})
+            order = max([50, *(item.order for item in result.applications if item.visible)]) + 10
+            self._write_user(
+                apps.Application(
+                    id=app_id, name=name.strip().upper(), kind="command",
+                    command="/usr/bin/firefox-esr", arguments=shlex.join(["--kiosk", url]),
+                    status_id=app_id, order=order,
+                    environment={"MOZ_ENABLE_WAYLAND": "1"},
+                )
+            )
+            self.status = f"ADDED {name.strip().upper()}"
+        except (OSError, apps.ManifestError) as error:
+            self.status = f"WEB APPLICATION NOT ADDED: {error}"
+
+    def edit(self, app: apps.Application) -> None:
+        while True:
+            rows = ["DISABLE" if app.enabled else "ENABLE", "MOVE UP", "MOVE DOWN"]
+            if not app.system:
+                rows.append("DELETE")
+            rows.append("BACK")
+            selected = 0
+            while True:
+                self.draw(app.name, rows, selected)
+                key = read_key(self.screen)
+                selected = move_selection(selected, key, len(rows))
+                if key == 27:
+                    return
+                if key in (curses.KEY_ENTER, 10, 13):
+                    break
+            choice = rows[selected]
+            result = self.result()
+            current = list(result.applications)
+            index = next((number for number, item in enumerate(current) if item.id == app.id), -1)
+            if index < 0 or choice == "BACK":
+                return
+            try:
+                if choice in {"ENABLE", "DISABLE"}:
+                    current[index] = dataclasses.replace(current[index], enabled=choice == "ENABLE")
+                elif choice.startswith("MOVE"):
+                    visible = [item for item in current if item.visible]
+                    position = next(number for number, item in enumerate(visible) if item.id == app.id)
+                    target = position - 1 if choice == "MOVE UP" else position + 1
+                    if not 0 <= target < len(visible):
+                        self.status = "APPLICATION IS ALREADY AT THE EDGE"
+                        continue
+                    visible[position], visible[target] = visible[target], visible[position]
+                    order_by_id = {item.id: (number + 1) * 10 for number, item in enumerate(visible)}
+                    current = [dataclasses.replace(item, order=order_by_id.get(item.id, item.order)) for item in current]
+                elif choice == "DELETE":
+                    system_dir = apps.SYSTEM_DIR if apps.SYSTEM_DIR.exists() else SOURCE_MANIFESTS
+                    apps.delete_user_application(app.id, system_dir=system_dir)
+                    self.status = f"DELETED {app.name}"
+                    self.launcher.reload_applications()
+                    return
+                apps.write_state(current)
+                self.launcher.reload_applications()
+                app = next(item for item in self.result().applications if item.id == app.id)
+                self.status = f"UPDATED {app.name}"
+            except (OSError, apps.ManifestError) as error:
+                self.status = f"APPLICATION NOT UPDATED: {error}"
+
+    def run(self) -> None:
+        while True:
+            result = self.result()
+            visible = [app for app in result.applications if app.visible]
+            rows = [f"{app.name:<28} {'ENABLED' if app.enabled else 'DISABLED'}" for app in visible]
+            rows += ["ADD COMMAND APPLICATION", "ADD WEB APPLICATION", "BACK"]
+            self.selected = min(self.selected, len(rows) - 1)
+            if result.errors:
+                self.status = f"{len(result.errors)} INVALID APPLICATION(S) SKIPPED"
+            self.draw("APPLICATIONS", rows, self.selected)
+            key = read_key(self.screen)
+            self.selected = move_selection(self.selected, key, len(rows))
+            if key == 27:
+                return
+            if key not in (curses.KEY_ENTER, 10, 13):
+                continue
+            if self.selected < len(visible):
+                self.edit(visible[self.selected])
+            elif self.selected == len(visible):
+                self.add_command()
+            elif self.selected == len(visible) + 1:
+                self.add_web()
+            else:
                 return
 
 

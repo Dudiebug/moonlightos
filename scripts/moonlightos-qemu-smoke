@@ -16,6 +16,15 @@ wait_for_file() {
 }
 
 wait_for_file /run/moonlightos/launcher-ready launcher
+test -x /usr/libexec/moonlightos-run-configured-app
+test -x /usr/libexec/moonlightos-osk
+test -x /usr/libexec/moonlightos-osk-session
+test -f /usr/share/moonlightos/apps.d/40-terminal.ini
+systemctl is-enabled --quiet moonlightos-configured-app.path
+systemctl is-enabled --quiet moonlightos-osk.path
+test "$(systemctl show --property=NRestarts --value moonlightos-configured-app.service)" = 0
+test "$(systemctl show --property=NRestarts --value moonlightos-osk.service)" = 0
+echo MOONLIGHTOS_SMOKE_CONFIGURED_PLATFORM_READY
 for _ in $(seq 1 250); do
   if systemctl is-failed --quiet moonlightos-usbipd.service; then
     systemctl --no-pager --full status moonlightos-usbipd.service >&2 || true

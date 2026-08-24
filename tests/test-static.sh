@@ -27,12 +27,13 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.6 ]]
+[[ "$(< VERSION)" == 0.1.7 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.6-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
-rg -q '^  actions: read$' .github/workflows/release-v1.1.yml
-rg -q 'git/matching-refs/tags/0\.1\.6' .github/workflows/release-v1.1.yml
-! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v1.1.yml
+rg -q 'moonlightos-0\.1\.7-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q '^  actions: read$' .github/workflows/release-v0.1.7.yml
+rg -q 'git/matching-refs/tags/0\.1\.7' .github/workflows/release-v0.1.7.yml
+rg -q 'docs/releases/v0\.1\.7\.md' .github/workflows/release-v0.1.7.yml
+! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.7.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
@@ -61,6 +62,9 @@ rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wpasupplicant$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^bluez$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^steam-devices$' config/live-build/package-lists/moonlightos.list.chroot
+! rg -q '^steam(-installer)?$|i386|multilib' config/live-build/package-lists/moonlightos.list.chroot build
+! rg -q '\bwvkbd\b' config build launcher scripts services
 rg -q '^libspa-0\.2-bluetooth$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^python3-dbus$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^python3-gi$' config/live-build/package-lists/moonlightos.list.chroot
@@ -83,6 +87,7 @@ rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'moonlightos-support-export.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q 'moonlightos-configured-app.path moonlightos-osk.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'bluetooth.service moonlightos-bluetooth.service' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 ! rg -q "$removed_units" config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q '^PathExists=/run/moonlightos/support-export.request$' services/moonlightos-support-export.path
@@ -105,6 +110,11 @@ rg -q '^/usr/bin/wireplumber --profile main-systemwide ' scripts/moonlightos-aud
 rg -q '^PIPEWIRE_DAEMON=true PIPEWIRE_CORE=pipewire-0 /usr/bin/pipewire ' scripts/moonlightos-audio
 rg -q 'moonlightos_bluetooth.py' build/configure.sh
 rg -q 'moonlightos-bluetoothd' build/configure.sh
+rg -q 'moonlightos-run-configured-app' build/configure.sh
+rg -q 'moonlightos-osk-session' build/configure.sh
+rg -q 'usr/share/moonlightos/apps.d' build/configure.sh
+! rg -q 'terminal_command|curses\.endwin' launcher/moonlightos-launcher.py
+! rg -q 'shell=True|\beval\b' launcher/moonlightos_apps.py launcher/moonlightos_app_runner.py launcher/moonlightos-launcher.py launcher/moonlightos_osk.py
 for forbidden in 'bluetooth''ctl' 'curses\.endwin' 'terminal_''command' 'SIG''INT' 'kill\(' 'shell=True'; do
   ! rg -n "$forbidden" launcher/moonlightos_bluetooth.py scripts/moonlightos-bluetoothd
 done
@@ -125,8 +135,10 @@ digest_pattern='s''ha-?256|s''ha256|\.s''ha256'
 ! rg -n -i "$digest_pattern" -g '!.git/**' -g '!tests/test-static.sh' .
 rg -q 'MIN_FREE' scripts/moonlightos-support-export
 
-python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_display.py \
-  launcher/moonlightos_support.py launcher/moonlightos_bluetooth.py launcher/gamepad-nav.py \
+python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_apps.py \
+  launcher/moonlightos_app_runner.py launcher/moonlightos_setup.py launcher/moonlightos_osk.py \
+  launcher/moonlightos_display.py launcher/moonlightos_support.py \
+  launcher/moonlightos_bluetooth.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address scripts/moonlightos-support-export \
   scripts/moonlightos-bluetoothd
 
@@ -190,6 +202,10 @@ for required in \
   services/moonlightos-qemu-smoke.service \
   services/moonlightos-support-export.path \
   services/moonlightos-support-export.service \
+  services/moonlightos-configured-app.path \
+  services/moonlightos-configured-app.service \
+  services/moonlightos-osk.path \
+  services/moonlightos-osk.service \
   services/moonlightos-usbipd.service \
   services/moonlightos-network-ready.service \
   services/moonlightos-tailscale-enroll.service; do

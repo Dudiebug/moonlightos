@@ -14,9 +14,9 @@ from typing import Any
 
 
 SOCKET_PATH = pathlib.Path("/run/moonlightos-bluetooth/control.sock")
+START_OSK = pathlib.Path("/run/moonlightos/start-osk")
 ENTER_KEYS = (curses.KEY_ENTER, 10, 13)
 SPINNER = "|/-\\"
-SCAN_SECONDS = 15
 MAX_RESPONSE = 65536
 ADDRESS_RE = re.compile(r"^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
@@ -122,6 +122,13 @@ class BluetoothMenu:
         self.client = client or BluetoothClient()
         self.status = ""
 
+    def _getch(self) -> int:
+        key = self.screen.getch()
+        if key == curses.KEY_F12:
+            START_OSK.touch()
+            return -1
+        return key
+
     @staticmethod
     def _center(width: int, text: str) -> tuple[int, str]:
         clipped = safe_text(text, max(0, width - 4))
@@ -183,7 +190,7 @@ class BluetoothMenu:
         rows = rows or [""]
         while True:
             self.draw(title, rows, None, footer="ENTER OR ESC TO RETURN")
-            if self.screen.getch() in (*ENTER_KEYS, 27):
+            if self._getch() in (*ENTER_KEYS, 27):
                 return
 
     def _request(self, command: str, **fields: object) -> dict[str, Any] | None:
@@ -208,7 +215,7 @@ class BluetoothMenu:
                 selected,
                 footer="THE LAUNCHER IS STILL AVAILABLE",
             )
-            key = self.screen.getch()
+            key = self._getch()
             selected = move_selection(selected, key, 2)
             if key in ENTER_KEYS:
                 return selected == 0
@@ -224,7 +231,7 @@ class BluetoothMenu:
                 selected,
                 details=["NO BLUETOOTH ADAPTER FOUND"],
             )
-            key = self.screen.getch()
+            key = self._getch()
             selected = move_selection(selected, key, 2)
             if key in ENTER_KEYS:
                 return selected == 0
@@ -236,7 +243,7 @@ class BluetoothMenu:
         alias = device_labels([device])[0]
         while True:
             self.draw(title, ["PAIR", "CANCEL"], selected, details=[alias])
-            key = self.screen.getch()
+            key = self._getch()
             selected = move_selection(selected, key, 2)
             if key in ENTER_KEYS:
                 return selected == 0
@@ -254,7 +261,7 @@ class BluetoothMenu:
             ]
             grid = ["  ".join(cells[row:row + 3]) for row in range(0, 12, 3)]
             self.draw(title, grid, None, details=[f"CODE: {value or '_'}"], footer="ARROWS SELECT  ENTER ACCEPTS  ESC CANCELS")
-            key = self.screen.getch()
+            key = self._getch()
             if (
                 ord("0") <= key <= ord("9")
                 or (not as_number and (ord("A") <= key <= ord("Z") or ord("a") <= key <= ord("z")))
@@ -307,7 +314,7 @@ class BluetoothMenu:
         selected = 0
         while True:
             self.draw(title, ["CONFIRM", "REJECT"], selected, details=details)
-            key = self.screen.getch()
+            key = self._getch()
             selected = move_selection(selected, key, 2)
             if key in ENTER_KEYS:
                 accepted = selected == 0
@@ -379,7 +386,7 @@ class BluetoothMenu:
                     footer="ESC CANCELS" if cancellable_pairing else "PLEASE WAIT",
                 )
                 frame += 1
-                key = self.screen.getch()
+                key = self._getch()
                 if key == 27 and cancellable_pairing:
                     self._request("cancel_pairing", operation_id=operation_id)
                     return False, operation
@@ -395,59 +402,6 @@ class BluetoothMenu:
         operation_id = str(response.get("operation_id") or "")
         if operation_id:
             self._wait_operation(operation_id, "PAIRING", cancellable_pairing=True)
-
-    def _scan(self) -> None:
-        response = self._request("start_scan")
-        if not response:
-            return
-        started = time.monotonic()
-        selected = 0
-        self.screen.timeout(100)
-        try:
-            while True:
-                elapsed = time.monotonic() - started
-                if elapsed >= SCAN_SECONDS:
-                    break
-                try:
-                    snapshot = self.client.snapshot()
-                except BluetoothError as error:
-                    self.message("BLUETOOTH SERVICE UNAVAILABLE", str(error))
-                    return
-                if snapshot.get("adapter") is None:
-                    self.message("BLUETOOTH ADAPTER REMOVED", "SCAN STOPPED")
-                    return
-                scan_error = safe_text(snapshot.get("error") or "", 240)
-                if "SCAN" in scan_error or "POWER BLUETOOTH" in scan_error:
-                    self.message("BLUETOOTH SCAN FAILED", scan_error)
-                    return
-                devices = list(snapshot.get("devices") or [])
-                devices.sort(key=lambda item: (not bool(item.get("paired")), -int(item.get("rssi") or -999)))
-                labels = device_labels(devices)
-                rows = labels or ["NO DEVICES FOUND YET"]
-                selected = min(selected, len(rows) - 1)
-                remaining = max(0, SCAN_SECONDS - int(elapsed))
-                self.draw(
-                    "ADD BLUETOOTH DEVICE",
-                    rows,
-                    selected if devices else None,
-                    details=[f"SCANNING...  {remaining:02d}S"],
-                    footer="ESC TO CANCEL",
-                )
-                key = self.screen.getch()
-                selected = move_selection(selected, key, len(rows))
-                if key == 27:
-                    return
-                if key in ENTER_KEYS and devices:
-                    device = devices[selected]
-                    self._request("stop_scan")
-                    if device.get("paired"):
-                        self._device_screen(str(device.get("path") or ""))
-                    else:
-                        self._pair(device)
-                    return
-        finally:
-            self._stop_scan_quietly()
-            self.screen.timeout(1000)
 
     def _run_device_action(self, command: str, path: str, title: str) -> bool:
         response = self._request(command, device=path)
@@ -486,7 +440,7 @@ class BluetoothMenu:
                 f"TRUSTED                        {'YES' if device.get('trusted') else 'NO'}",
             ]
             self.draw(device_labels([device])[0], [item[0] for item in actions], selected, details=details)
-            key = self.screen.getch()
+            key = self._getch()
             selected = move_selection(selected, key, len(actions))
             if key == 27:
                 return
@@ -503,57 +457,96 @@ class BluetoothMenu:
 
     def run(self) -> None:
         selected = 0
-        self.screen.timeout(1000)
-        while True:
-            try:
-                snapshot = self.client.snapshot()
-            except BluetoothError:
-                if self._service_unavailable():
-                    continue
-                return
-            self.status = safe_text(snapshot.get("error") or "", 240)
-            adapter = snapshot.get("adapter")
-            if not isinstance(adapter, dict):
-                if self._no_adapter():
-                    continue
-                return
+        discovery_requested = False
+        last_scan_request = 0.0
+        self.screen.timeout(100)
+        try:
+            while True:
+                try:
+                    snapshot = self.client.snapshot()
+                except BluetoothError:
+                    discovery_requested = False
+                    self.screen.timeout(1000)
+                    if self._service_unavailable():
+                        self.screen.timeout(100)
+                        continue
+                    return
+                self.status = safe_text(snapshot.get("error") or "", 240)
+                adapter = snapshot.get("adapter")
+                if not isinstance(adapter, dict):
+                    discovery_requested = False
+                    self.screen.timeout(1000)
+                    if self._no_adapter():
+                        self.screen.timeout(100)
+                        continue
+                    return
 
-            if not adapter.get("powered"):
-                actions = [("TURN BLUETOOTH ON", "power_on"), ("BACK", "back")]
-                selected = min(selected, 1)
-                self.draw("BLUETOOTH", [item[0] for item in actions], selected, details=["OFF"])
-            else:
-                devices = [item for item in snapshot.get("devices") or [] if item.get("paired")]
-                devices.sort(key=lambda item: (not bool(item.get("connected")), safe_text(item.get("alias") or "").casefold()))
-                labels = device_labels(devices)
-                actions = [("ADD DEVICE", "scan")]
-                actions.extend(
-                    (f"{label:<32} {'CONNECTED' if device.get('connected') else 'DISCONNECTED'}", str(device.get("path") or ""))
-                    for label, device in zip(labels, devices)
-                )
-                actions.extend((("TURN BLUETOOTH OFF", "power_off"), ("BACK", "back")))
-                selected = min(selected, len(actions) - 1)
-                self.draw("BLUETOOTH", [item[0] for item in actions], selected, details=["ON"])
+                if not adapter.get("powered"):
+                    discovery_requested = False
+                    actions = [("TURN BLUETOOTH ON", "power_on"), ("BACK", "back")]
+                    selected = min(selected, 1)
+                    self.draw("BLUETOOTH", [item[0] for item in actions], selected, details=["OFF"])
+                else:
+                    if not discovery_requested or (
+                        not adapter.get("discovering")
+                        and time.monotonic() - last_scan_request >= 1.0
+                    ):
+                        discovery_requested = self._request("start_scan") is not None
+                        last_scan_request = time.monotonic()
+                    devices = list(snapshot.get("devices") or [])
+                    devices.sort(
+                        key=lambda item: (
+                            not bool(item.get("paired")),
+                            not bool(item.get("connected")),
+                            safe_text(item.get("alias") or "").casefold(),
+                        )
+                    )
+                    labels = device_labels(devices)
+                    actions = [("RESCAN", "rescan")]
+                    actions.extend(
+                        (
+                            f"{label:<32} "
+                            f"{'CONNECTED' if device.get('connected') else ('PAIRED' if device.get('paired') else 'AVAILABLE')}",
+                            str(device.get("path") or ""),
+                        )
+                        for label, device in zip(labels, devices)
+                    )
+                    actions.extend((("TURN BLUETOOTH OFF", "power_off"), ("BACK", "back")))
+                    selected = min(selected, len(actions) - 1)
+                    scanning = "SCANNING" if adapter.get("discovering") or discovery_requested else "SCAN STOPPED"
+                    self.draw("BLUETOOTH", [item[0] for item in actions], selected, details=[f"ON  ·  {scanning}"])
 
-            key = self.screen.getch()
-            selected = move_selection(selected, key, len(actions))
-            if key == 27:
-                self._stop_scan_quietly()
-                return
-            if key not in ENTER_KEYS:
-                continue
-            action = actions[selected][1]
-            if action == "back":
-                self._stop_scan_quietly()
-                return
-            if action == "power_on":
-                self._request("set_power", powered=True)
-            elif action == "power_off":
-                self._request("set_power", powered=False)
-            elif action == "scan":
-                self._scan()
-            else:
-                self._device_screen(action)
+                key = self._getch()
+                selected = move_selection(selected, key, len(actions))
+                if key == 27:
+                    return
+                if key not in ENTER_KEYS:
+                    continue
+                action = actions[selected][1]
+                if action == "back":
+                    return
+                if action == "power_on":
+                    self._request("set_power", powered=True)
+                elif action == "power_off":
+                    self._stop_scan_quietly()
+                    discovery_requested = False
+                    self._request("set_power", powered=False)
+                elif action == "rescan":
+                    self._stop_scan_quietly()
+                    discovery_requested = self._request("start_scan") is not None
+                    last_scan_request = time.monotonic()
+                else:
+                    device = next((item for item in snapshot.get("devices") or [] if item.get("path") == action), None)
+                    if device:
+                        self._stop_scan_quietly()
+                        discovery_requested = False
+                        if device.get("paired"):
+                            self._device_screen(action)
+                        else:
+                            self._pair(device)
+        finally:
+            self._stop_scan_quietly()
+            self.screen.timeout(1000)
 
 
 def run_bluetooth(screen: curses.window, client: BluetoothClient | None = None) -> None:
