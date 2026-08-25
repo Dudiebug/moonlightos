@@ -18,6 +18,18 @@ wait_for_file() {
 wait_for_file /run/moonlightos/launcher-ready launcher
 case $mode in
   persistence-write)
+    test -d /sys/firmware/efi
+    root_source=$(findmnt -n -o SOURCE /)
+    root_fstype=$(findmnt -n -o FSTYPE /)
+    root_options=$(findmnt -n -o OPTIONS /)
+    [[ $root_source == /dev/vda* ]]
+    [[ $root_fstype == ext4 ]]
+    [[ ,$root_options, == *,rw,* ]]
+    printf 'installed_root=%s fstype=%s options=%s\n' \
+      "$root_source" "$root_fstype" "$root_options"
+    lsblk --fs
+    blkid
+    echo MOONLIGHTOS_SMOKE_INSTALLED_DISK_READY
     printf '\n[qemu-smoke]\ncold_boot = verified\n' >> /var/lib/moonlightos/config.ini
     sync
     echo MOONLIGHTOS_SMOKE_PERSISTENCE_WRITTEN

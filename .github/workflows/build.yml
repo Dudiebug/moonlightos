@@ -34,24 +34,21 @@ jobs:
       - name: Source tests
         run: make test
       - name: Build ISO
-        run: sudo make build
-      - name: QEMU boot smoke test
         run: |
-          if ! make qemu-smoke; then
-            cat /tmp/moonlightos-qemu-smoke.log || true
-            exit 1
-          fi
+          sudo make build
+          sudo chown -R "$(id -u):$(id -g)" build/out
+      - name: Final release gauntlet
+        run: make release-gauntlet
         env:
           MOONLIGHTOS_QEMU_LOG: /tmp/moonlightos-qemu-smoke.log
           MOONLIGHTOS_QEMU_SCREENSHOT: /tmp/moonlightos-qemu-smoke.ppm
-      - name: QEMU install smoke test
-        run: make qemu-install-smoke
-        env:
           MOONLIGHTOS_QEMU_INSTALL_LOG: /tmp/moonlightos-qemu-install.log
           MOONLIGHTOS_QEMU_INSTALLED_BOOT_LOG: /tmp/moonlightos-qemu-installed-boot.log
-      - name: QEMU persistence smoke test
-        run: make qemu-persistence-smoke
-        env:
+          MOONLIGHTOS_QEMU_INSTALL_MENU_SCREENSHOT: /tmp/moonlightos-qemu-install-menu.ppm
+          MOONLIGHTOS_QEMU_INSTALL_EDITOR_SCREENSHOT: /tmp/moonlightos-qemu-install-editor.ppm
+          MOONLIGHTOS_QEMU_INSTALLER_SCREENSHOT: /tmp/moonlightos-qemu-installer.ppm
+          MOONLIGHTOS_QEMU_INSTALLED_SCREENSHOT: /tmp/moonlightos-qemu-installed-launcher.ppm
+          MOONLIGHTOS_QEMU_INSTALL_CONFIG: /tmp/moonlightos-qemu-install-config.log
           MOONLIGHTOS_QEMU_PERSISTENCE_LOG: /tmp/moonlightos-qemu-persistence.log
       - name: Upload failed boot diagnostics
         if: failure()
@@ -63,12 +60,40 @@ jobs:
             /tmp/moonlightos-qemu-smoke.ppm
             /tmp/moonlightos-qemu-install.log
             /tmp/moonlightos-qemu-installed-boot.log
+            /tmp/moonlightos-qemu-install-menu.ppm
+            /tmp/moonlightos-qemu-install-editor.ppm
+            /tmp/moonlightos-qemu-installer.ppm
+            /tmp/moonlightos-qemu-installed-launcher.ppm
+            /tmp/moonlightos-qemu-install-config.log
             /tmp/moonlightos-qemu-persistence.log
           if-no-files-found: warn
           retention-days: 2
+      - name: Record ISO checksum
+        run: |
+          (cd build/out && sha256sum moonlightos-0.1.9-amd64.iso \
+            > moonlightos-0.1.9-amd64.iso.sha256)
       - name: Upload ISO
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.8-amd64
-          path: build/out/moonlightos-0.1.8-amd64.iso
+          name: moonlightos-0.1.9-amd64
+          path: |
+            build/out/moonlightos-0.1.9-amd64.iso
+            build/out/moonlightos-0.1.9-amd64.iso.sha256
           if-no-files-found: error
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonlightos-0.1.9-evidence
+          path: |
+            /tmp/moonlightos-qemu-smoke.log
+            /tmp/moonlightos-qemu-smoke.ppm
+            /tmp/moonlightos-qemu-install.log
+            /tmp/moonlightos-qemu-installed-boot.log
+            /tmp/moonlightos-qemu-install-menu.ppm
+            /tmp/moonlightos-qemu-install-editor.ppm
+            /tmp/moonlightos-qemu-installer.ppm
+            /tmp/moonlightos-qemu-installed-launcher.ppm
+            /tmp/moonlightos-qemu-install-config.log
+            /tmp/moonlightos-qemu-persistence.log
+          if-no-files-found: error
+          retention-days: 30

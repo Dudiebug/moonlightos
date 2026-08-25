@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-0.1.8-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.9-amd64.iso}
 SCREENSHOT=${MOONLIGHTOS_QEMU_SCREENSHOT:-/tmp/moonlightos-qemu-smoke.ppm}
 command -v qemu-system-x86_64 >/dev/null || { echo 'qemu-system-x86_64 is required' >&2; exit 127; }
 [[ -f "$ISO" ]] || { echo "ISO not found: $ISO" >&2; exit 66; }
@@ -24,9 +24,16 @@ cleanup() {
 trap cleanup EXIT
 
 if command -v xorriso >/dev/null; then
-  grub_cfg=$(mktemp)
-  temporary_files+=("$grub_cfg")
+  boot_extract=$(mktemp -d)
+  temporary_files+=("$boot_extract")
+  grub_cfg=$boot_extract/grub.cfg
   xorriso -osirrox on -indev "$ISO" -extract /boot/grub/grub.cfg "$grub_cfg" >/dev/null 2>&1
+  grub_listing=$(xorriso -indev "$ISO" \
+    -find /boot/grub/grub.cfg -exec lsdl -- 2>/dev/null)
+  grep -q '^-r-xr-xr-x' <<< "$grub_listing" || {
+    printf 'ISO GRUB config lost mode 0555: %s\n' "$grub_listing" >&2
+    exit 65
+  }
   grep -q '^set default=0$' "$grub_cfg" || { echo 'ISO GRUB config lacks the default entry' >&2; exit 65; }
   grep -q '^set timeout=3$' "$grub_cfg" || { echo 'ISO GRUB config lacks the appliance timeout' >&2; exit 65; }
   grep -q '^serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial setup' >&2; exit 65; }
@@ -36,10 +43,15 @@ if command -v xorriso >/dev/null; then
   grep -q '^menuentry "Start MoonlightOS (No Persistence)"' "$grub_cfg" || { echo 'ISO GRUB config lacks the recovery live entry' >&2; exit 65; }
   grep -q 'boot=live.*components.*persistence.*ipv6.disable=1.*console=tty1.*console=ttyS0,115200n8' "$grub_cfg" || { echo 'ISO GRUB config lacks expected live boot arguments' >&2; exit 65; }
   grep -q 'boot=live.*components.*nopersistence.*ipv6.disable=1' "$grub_cfg" || { echo 'ISO GRUB recovery entry does not disable persistence' >&2; exit 65; }
-  installer_cfg=$(mktemp)
-  temporary_files+=("$installer_cfg")
+  installer_cfg=$boot_extract/install_start.cfg
   xorriso -osirrox on -indev "$ISO" -extract /boot/grub/install_start.cfg "$installer_cfg" >/dev/null 2>&1
   grep -q "menuentry 'Install MoonlightOS'" "$installer_cfg" || { echo 'ISO GRUB config lacks the MoonlightOS installer entry' >&2; exit 65; }
+  grep -q 'vga=788 theme=dark ipv6.disable=1 --- quiet' "$installer_cfg" || { echo 'ISO installer does not use the dark text theme' >&2; exit 65; }
+  theme_cfg=$boot_extract/theme.cfg
+  xorriso -osirrox on -indev "$ISO" -extract /boot/grub/theme.cfg "$theme_cfg" >/dev/null 2>&1
+  grep -q '^set color_normal=white/black$' "$theme_cfg" || { echo 'ISO GRUB normal colors are not high contrast' >&2; exit 65; }
+  grep -q '^set color_highlight=black/white$' "$theme_cfg" || { echo 'ISO GRUB selected colors are not inverted' >&2; exit 65; }
+  ! grep -q '^set theme=' "$theme_cfg" || { echo 'ISO still enables the graphical Debian GRUB theme' >&2; exit 65; }
 fi
 
 capture_screen() {

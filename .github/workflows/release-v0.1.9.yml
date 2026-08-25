@@ -1,0 +1,99 @@
+name: release-v0.1.9
+
+on:
+  workflow_run:
+    workflows: [build-and-smoke-test]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out release notes
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Check v0.1.9 release eligibility
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [[ "$(< VERSION)" != 0.1.9 ]]; then
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tagged_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/0.1.9" \
+            --jq '.[] | select(.ref == "refs/tags/0.1.9") | .object.sha')
+          if [[ -n "$tagged_sha" && "$tagged_sha" != "$RELEASE_SHA" ]]; then
+            echo "0.1.9 already points to $tagged_sha; refusing to replace it."
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          existing_release=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.tag_name == "0.1.9") | [.draft, .id] | @tsv')
+          if [[ -n "$existing_release" && ${existing_release%%$'\t'*} != true ]]; then
+            echo '0.1.9 is already public; refusing to replace its assets.'
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'publish=true' >> "$GITHUB_OUTPUT"
+
+      - name: Download the boot-tested ISO artifact
+        if: steps.eligibility.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: moonlightos-0.1.9-amd64
+          path: dist
+          repository: Dudiebug/moonlightos
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download boot evidence
+        if: steps.eligibility.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: moonlightos-0.1.9-evidence
+          path: dist/evidence
+          repository: Dudiebug/moonlightos
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify and create draft release
+        if: steps.eligibility.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          (cd dist && sha256sum --check moonlightos-0.1.9-amd64.iso.sha256)
+          if gh release view 0.1.9 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload 0.1.9 \
+              --repo "$GITHUB_REPOSITORY" --clobber \
+              dist/moonlightos-0.1.9-amd64.iso \
+              dist/moonlightos-0.1.9-amd64.iso.sha256 \
+              dist/evidence/*
+            gh release edit 0.1.9 \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "MoonlightOS v0.1.9" \
+              --notes-file docs/releases/v0.1.9.md \
+              --draft
+          else
+            gh release create 0.1.9 \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$RELEASE_SHA" \
+              --title "MoonlightOS v0.1.9" \
+              --notes-file docs/releases/v0.1.9.md \
+              --draft \
+              dist/moonlightos-0.1.9-amd64.iso \
+              dist/moonlightos-0.1.9-amd64.iso.sha256 \
+              dist/evidence/*
+          fi
