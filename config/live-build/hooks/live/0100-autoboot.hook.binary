@@ -25,12 +25,23 @@ while IFS= read -r -d '' cfg; do
     }
     !capture { print }
   ' "$cfg" > "$output"
+  chmod --reference="$cfg" "$output"
   mv "$output" "$cfg"
 done < <(find . -type f -path '*/boot/grub/grub.cfg' -print0)
 
 while IFS= read -r -d '' cfg; do
   sed -i "s/menuentry 'Start installer'/menuentry 'Install MoonlightOS'/" "$cfg"
-done < <(find . -type f -path '*/boot/grub/install_start.cfg' -print0)
+  sed -i 's/vga=788 ipv6.disable=1/vga=788 theme=dark ipv6.disable=1/g' "$cfg"
+done < <(find . -type f -path '*/boot/grub/install*.cfg' -print0)
+
+while IFS= read -r -d '' cfg; do
+  printf '%s\n' \
+    'set color_normal=white/black' \
+    'set color_highlight=black/white' \
+    'set menu_color_normal=white/black' \
+    'set menu_color_highlight=black/white' \
+    'unset theme' > "$cfg"
+done < <(find . -type f -path '*/boot/grub/theme.cfg' -print0)
 
 while IFS= read -r -d '' cfg; do
   sed -i '/^timeout /d' "$cfg"
@@ -53,9 +64,23 @@ while IFS= read -r -d '' cfg; do
     }
     { print }
   ' "$cfg" > "$output"
+  chmod --reference="$cfg" "$output"
   mv "$output" "$cfg"
 done < <(find . -type f -path '*/isolinux/live.cfg' -print0)
 
 while IFS= read -r -d '' cfg; do
   sed -i 's/menu label Start \^installer/menu label ^Install MoonlightOS/' "$cfg"
+  sed -i 's/vga=788 ipv6.disable=1/vga=788 theme=dark ipv6.disable=1/g' "$cfg"
 done < <(find . -type f -path '*/isolinux/install.cfg' -print0)
+
+while IFS= read -r -d '' cfg; do
+  sed -i '/^menu background /d; /^menu color /d' "$cfg"
+  printf '%s\n' \
+    'menu color screen    * #ffffffff #00000000 std' \
+    'menu color title     * #ffffffff #00000000 std' \
+    'menu color border    * #ffffffff #00000000 std' \
+    'menu color sel       * #ff000000 #ffffffff *' \
+    'menu color hotsel    1;7;30;47 #ff000000 #ffffffff *' \
+    'menu color tabmsg    * #ffffffff #00000000 std' \
+    'menu color help      37;40 #ffffffff #00000000 std' >> "$cfg"
+done < <(find . -type f -path '*/isolinux/stdmenu.cfg' -print0)

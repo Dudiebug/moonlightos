@@ -15,11 +15,17 @@ done < <(rg -l '^#!/bin/bash' build host scripts tests usbip config/live-build/h
 
 boot_test=$(mktemp -d)
 mkdir -p "$boot_test/binary/boot/grub" "$boot_test/binary/isolinux"
-printf 'menuentry "Live system (amd64)" --hotkey=l {\n linux /live/vmlinuz boot=live components persistence ipv6.disable=1\n initrd /live/initrd.img\n}\n' > "$boot_test/binary/boot/grub/grub.cfg"
-printf "menuentry 'Start installer' {}\n" > "$boot_test/binary/boot/grub/install_start.cfg"
+printf 'menuentry "Live system (amd64)" --hotkey=l {\n linux /live/vmlinuz boot=live components persistence ipv6.disable=1\n initrd /live/initrd.img\n}\nsubmenu '\''Advanced install options ...'\'' {}\nsubmenu '\''Utilities...'\'' {}\n' > "$boot_test/binary/boot/grub/grub.cfg"
+printf "menuentry 'Start installer' {\n linux /install/vmlinuz vga=788 ipv6.disable=1 --- quiet\n initrd /install/initrd.gz\n}\n" > "$boot_test/binary/boot/grub/install_start.cfg"
+printf 'set color_normal=light-gray/black\nset color_highlight=white/dark-gray\nset theme=/boot/grub/live-theme/theme.txt\n' > "$boot_test/binary/boot/grub/theme.cfg"
 printf 'include menu.cfg\nprompt 0\ntimeout 0\n' > "$boot_test/binary/isolinux/isolinux.cfg"
 printf 'label live-amd64\n menu label ^Live system (amd64)\n menu default\n linux /live/vmlinuz\n initrd /live/initrd.img\n append boot=live components persistence ipv6.disable=1\n' > "$boot_test/binary/isolinux/live.cfg"
-printf 'label installstart\n menu label Start ^installer\n' > "$boot_test/binary/isolinux/install.cfg"
+printf 'label installstart\n menu label Start ^installer\n linux /install/vmlinuz\n initrd /install/initrd.gz\n append vga=788 ipv6.disable=1 --- quiet\nlabel rescue\n append rescue/enable=true vga=788 ipv6.disable=1 --- quiet\n' > "$boot_test/binary/isolinux/install.cfg"
+printf 'menu background splash.png\nmenu color sel * #ffffffff #76a1d0ff *\nmenu color help 37;40 #ffdddd00 #00000000 none\n' > "$boot_test/binary/isolinux/stdmenu.cfg"
+grub_mode=$(stat -c %a "$boot_test/binary/boot/grub/grub.cfg")
+isolinux_mode=$(stat -c %a "$boot_test/binary/isolinux/live.cfg")
+grub_installer_args=$(rg '^[[:space:]]+linux /install/' "$boot_test/binary/boot/grub/install_start.cfg")
+isolinux_installer_args=$(rg '^[[:space:]]+append ' "$boot_test/binary/isolinux/install.cfg")
 (cd "$boot_test" && bash "$ROOT/config/live-build/hooks/live/0100-autoboot.hook.binary")
 (cd "$boot_test" && bash "$ROOT/config/live-build/hooks/live/0100-autoboot.hook.binary")
 rg -q '^set default=0$' "$boot_test/binary/boot/grub/grub.cfg"
@@ -30,6 +36,15 @@ rg -q '^menuentry "Start MoonlightOS \(No Persistence\)"' "$boot_test/binary/boo
 [[ $(rg -c '^menuentry "Start MoonlightOS \(No Persistence\)"' "$boot_test/binary/boot/grub/grub.cfg") == 1 ]]
 rg -q 'boot=live components nopersistence ipv6.disable=1' "$boot_test/binary/boot/grub/grub.cfg"
 rg -q "menuentry 'Install MoonlightOS'" "$boot_test/binary/boot/grub/install_start.cfg"
+rg -q 'linux /install/vmlinuz vga=788 theme=dark ipv6.disable=1 --- quiet' "$boot_test/binary/boot/grub/install_start.cfg"
+[[ $(sed 's/ theme=dark//' <<< "$(rg '^[[:space:]]+linux /install/' "$boot_test/binary/boot/grub/install_start.cfg")") == "$grub_installer_args" ]]
+rg -q "submenu 'Advanced install options \.\.\.'" "$boot_test/binary/boot/grub/grub.cfg"
+rg -q "submenu 'Utilities\.\.\.'" "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^set color_normal=white/black$' "$boot_test/binary/boot/grub/theme.cfg"
+rg -q '^set color_highlight=black/white$' "$boot_test/binary/boot/grub/theme.cfg"
+! rg -q '^set theme=' "$boot_test/binary/boot/grub/theme.cfg"
+[[ $(stat -c %a "$boot_test/binary/boot/grub/grub.cfg") == "$grub_mode" ]]
+[[ $(stat -c %a "$boot_test/binary/isolinux/live.cfg") == "$isolinux_mode" ]]
 rg -q '^timeout 30$' "$boot_test/binary/isolinux/isolinux.cfg"
 ! rg -q '^timeout 0$' "$boot_test/binary/isolinux/isolinux.cfg"
 rg -q 'menu label \^Start MoonlightOS$' "$boot_test/binary/isolinux/live.cfg"
@@ -37,17 +52,25 @@ rg -q 'menu label Start MoonlightOS \(No Persistence\)$' "$boot_test/binary/isol
 [[ $(rg -c 'menu label Start MoonlightOS \(No Persistence\)$' "$boot_test/binary/isolinux/live.cfg") == 1 ]]
 rg -q 'boot=live components nopersistence ipv6.disable=1' "$boot_test/binary/isolinux/live.cfg"
 rg -q 'menu label \^Install MoonlightOS$' "$boot_test/binary/isolinux/install.cfg"
+rg -q 'append vga=788 theme=dark ipv6.disable=1 --- quiet' "$boot_test/binary/isolinux/install.cfg"
+rg -q 'rescue/enable=true vga=788 theme=dark ipv6.disable=1' "$boot_test/binary/isolinux/install.cfg"
+[[ $(sed 's/ theme=dark//' <<< "$(rg '^[[:space:]]+append ' "$boot_test/binary/isolinux/install.cfg")") == "$isolinux_installer_args" ]]
+! rg -q '^menu background ' "$boot_test/binary/isolinux/stdmenu.cfg"
+rg -q '^menu color sel[[:space:]]+\* #ff000000 #ffffffff \*$' "$boot_test/binary/isolinux/stdmenu.cfg"
 find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.8 ]]
+[[ "$(< VERSION)" == 0.1.9 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.8-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
-rg -q '^  actions: read$' .github/workflows/release-v0.1.8.yml
-rg -q 'git/matching-refs/tags/0\.1\.8' .github/workflows/release-v0.1.8.yml
-rg -q 'docs/releases/v0\.1\.8\.md' .github/workflows/release-v0.1.8.yml
-! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.8.yml
+rg -q 'moonlightos-0\.1\.9-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'cd build/out && sha256sum moonlightos-0\.1\.9-amd64\.iso' .github/workflows/build.yml
+rg -q '^  actions: read$' .github/workflows/release-v0.1.9.yml
+rg -q 'git/matching-refs/tags/0\.1\.9' .github/workflows/release-v0.1.9.yml
+rg -q 'docs/releases/v0\.1\.9\.md' .github/workflows/release-v0.1.9.yml
+rg -q -- '--draft' .github/workflows/release-v0.1.9.yml
+rg -q 'already public; refusing to replace its assets' .github/workflows/release-v0.1.9.yml
+! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.9.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
@@ -145,11 +168,36 @@ rg -q '^ExecStart=/usr/sbin/usbipd --ipv4$' services/moonlightos-usbipd.service
 ! rg -q -- '--foreground' services/moonlightos-usbipd.service
 rg -q 'MOONLIGHTOS_SMOKE_USBIP_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'MOONLIGHTOS_SMOKE_BLUETOOTH_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
+! rg -q -- '-kernel|-initrd' tests/qemu-install-smoke.sh
+rg -q 'qemu_iso_boot.py' tests/qemu-install-smoke.sh
+rg -q '32G' tests/qemu-install-smoke.sh
+rg -q 'blank_disk=true' tests/qemu-install-smoke.sh
+rg -q 'MOONLIGHTOS_SMOKE_INSTALLED_DISK_READY' scripts/moonlightos-qemu-smoke tests/qemu-install-smoke.sh
+rg -q 'MOONLIGHTOS_QEMU_INSTALLER_SCREENSHOT' tests/qemu-install-smoke.sh .github/workflows/build.yml
+rg -q 'MOONLIGHTOS_QEMU_INSTALLED_SCREENSHOT' tests/qemu-install-smoke.sh .github/workflows/build.yml
+rg -q 'Screenshot evidence missing' tests/qemu-install-smoke.sh
+rg -q 'findmnt -n -o FSTYPE /' scripts/moonlightos-qemu-smoke
+rg -q 'lsblk --fs' scripts/moonlightos-qemu-smoke
+rg -q '^[[:space:]]*blkid$' scripts/moonlightos-qemu-smoke
+rg -q '^release-gauntlet:' Makefile
+rg -q 'python3 tools/mutants.py' tools/release-gauntlet.sh
+rg -q 'make qemu-install-smoke' tools/release-gauntlet.sh
 rg -q 'NRestarts' scripts/moonlightos-qemu-smoke
 rg -q 'moonlightos-audio.service' scripts/moonlightos-qemu-smoke
 rg -q '^runuser -u moonlightos -- env XDG_RUNTIME_DIR=/run/moonlightos' scripts/moonlightos-qemu-smoke
 digest_pattern='s''ha-?256|s''ha256|\.s''ha256'
-! rg -n -i "$digest_pattern" -g '!.git/**' -g '!tests/test-static.sh' .
+digest_control=$(mktemp)
+printf 'sha256\n' > "$digest_control"
+rg -q -i "$digest_pattern" "$digest_control"
+rm -f -- "$digest_control"
+if rg -n -i "$digest_pattern" \
+  scripts/moonlightos-support-export launcher/moonlightos_support.py docs/SUPPORT.md; then
+  echo 'Support export must not create checksum sidecars or manifests.' >&2
+  exit 1
+else
+  status=$?
+  [[ $status == 1 ]] || exit "$status"
+fi
 rg -q 'MIN_FREE' scripts/moonlightos-support-export
 
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_apps.py \
