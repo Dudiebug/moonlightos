@@ -179,6 +179,8 @@ rg -q 'qemu_iso_boot.py' tests/qemu-install-smoke.sh
 rg -q '32G' tests/qemu-install-smoke.sh
 rg -q 'blank_disk=true' tests/qemu-install-smoke.sh
 rg -q 'MOONLIGHTOS_SMOKE_INSTALLED_DISK_READY' scripts/moonlightos-qemu-smoke tests/qemu-install-smoke.sh
+rg -q "grep -q 'Requesting system reboot'" tests/qemu-install-smoke.sh
+rg -q 'install_complete=true' tests/qemu-install-smoke.sh
 rg -q 'MOONLIGHTOS_QEMU_INSTALLER_SCREENSHOT' tests/qemu-install-smoke.sh .github/workflows/build.yml
 rg -q 'MOONLIGHTOS_QEMU_INSTALLED_SCREENSHOT' tests/qemu-install-smoke.sh .github/workflows/build.yml
 rg -q 'Screenshot evidence missing' tests/qemu-install-smoke.sh
