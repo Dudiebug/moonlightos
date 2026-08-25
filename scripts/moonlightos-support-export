@@ -299,6 +299,7 @@ def collect(bundle: pathlib.Path) -> None:
             "-f=${binary:Package}\t${Version}\n",
             "cage",
             "firefox-esr",
+            "chromium",
             "linux-image-amd64",
             "mesa-vulkan-drivers",
             "network-manager",

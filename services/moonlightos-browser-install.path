@@ -1,0 +1,9 @@
+[Unit]
+Description=Process MoonlightOS browser selections
+
+[Path]
+PathExists=/run/moonlightos/browser-install.request
+Unit=moonlightos-browser-install.service
+
+[Install]
+WantedBy=graphical.target

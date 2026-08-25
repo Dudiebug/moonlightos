@@ -79,27 +79,27 @@ rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
 ! rg -q 'Before=.*moonlightos-launcher.service' services/moonlightos-network-ready.service
-! rg -q 'moonlightos-network-ready.service' services/moonlightos-{moonlight,chiaki,firefox}.service
+! rg -q 'moonlightos-network-ready.service' services/moonlightos-{moonlight,chiaki,browser}.service
 rg -q 'MOONLIGHTOS_LAUNCHER_READY' services/moonlightos-launcher.service tests/qemu-smoke.sh
 rg -q 'StandardOutput=journal\+console' services/moonlightos-launcher.service
 ! rg -q '^Environment=WAYLAND_DISPLAY=' services/moonlightos-launcher.service
 rg -q '/usr/bin/cage -s -- /usr/bin/foot --fullscreen' services/moonlightos-launcher.service
 rg -q '^Environment=QT_QPA_PLATFORM=xcb$' services/moonlightos-moonlight.service
 rg -q '^Environment=QT_QPA_PLATFORM=wayland$' services/moonlightos-chiaki.service
-rg -q '^Environment=MOZ_ENABLE_WAYLAND=1$' services/moonlightos-firefox.service
-rg -q '^EnvironmentFile=-/run/moonlightos/session.env$' services/moonlightos-{moonlight,chiaki,firefox}.service
+rg -q '^Environment=MOZ_ENABLE_WAYLAND=1$' services/moonlightos-browser.service
+rg -q '^EnvironmentFile=-/run/moonlightos/session.env$' services/moonlightos-{moonlight,chiaki,browser}.service
 rg -q '^ConditionFileIsExecutable=/opt/moonlightos/apps/moonlight/usr/bin/moonlight$' services/moonlightos-moonlight.service
 rg -q '^ConditionFileIsExecutable=/opt/moonlightos/apps/chiaki-ng/usr/bin/chiaki$' services/moonlightos-chiaki.service
-rg -q '^ConditionFileIsExecutable=/usr/bin/firefox-esr$' services/moonlightos-firefox.service
 rg -q 'binary=\$appdir/usr/bin/moonlight' scripts/moonlightos-run-app
 rg -q 'binary=\$appdir/usr/bin/chiaki' scripts/moonlightos-run-app
-rg -q 'binary=/usr/bin/firefox-esr' scripts/moonlightos-run-app
+rg -q 'binary=/usr/bin/moonlightos-browser' scripts/moonlightos-run-app
+rg -q 'command="/usr/bin/moonlightos-browser"' launcher/moonlightos-launcher.py
 rg -q 'write_status starting' scripts/moonlightos-run-app
 rg -q 'failed: exited before the application became ready' scripts/moonlightos-run-app
 rg -q 'unsquashfs -quiet -offset' build/configure.sh
 removed_units='moonlightos-escape''-guard|moonlightos-stop''-active-app'
 ! rg -q "$removed_units" build/configure.sh
-rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
+! rg -q '^firefox-esr$|^chromium$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wpasupplicant$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^bluez$' config/live-build/package-lists/moonlightos.list.chroot
@@ -121,15 +121,16 @@ rg -q '/boot/grub/grub.cfg' tests/qemu-smoke.sh
 rg -q 'MOONLIGHTOS_APP_STARTED' scripts/moonlightos-run-app
 rg -q 'moonlight-ready' scripts/moonlightos-qemu-smoke
 rg -q 'chiaki-ng-ready' scripts/moonlightos-qemu-smoke
-rg -q 'firefox-ready' scripts/moonlightos-qemu-smoke
-rg -q 'systemctl start --no-block moonlightos-firefox.service' scripts/moonlightos-qemu-smoke
+rg -q 'test ! -x /usr/bin/firefox-esr' scripts/moonlightos-qemu-smoke
+rg -q 'test ! -x /usr/bin/chromium' scripts/moonlightos-qemu-smoke
 rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
 rg -q 'qemu-persistence-smoke' Makefile .github/workflows/build.yml
 rg -q 'live-persistence-write' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh
 rg -q 'live-persistence-absent' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh
 rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-smoke.service
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
-rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q 'moonlightos-browser.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q 'moonlightos-browser-install.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'moonlightos-support-export.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'moonlightos-configured-app.path moonlightos-osk.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
 rg -q 'bluetooth.service moonlightos-bluetooth.service' config/live-build/hooks/live/0100-moonlightos.hook.chroot
@@ -146,7 +147,7 @@ rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-bluetooth.service
 rg -q '^User=moonlightos$' services/moonlightos-bluetooth.service
 rg -q '^ExecStart=/usr/libexec/moonlightos-bluetoothd$' services/moonlightos-bluetooth.service
 rg -q '^After=.*dbus.service.*bluetooth.service$' services/moonlightos-audio.service
-for unit in audio bluetooth moonlight chiaki firefox; do
+for unit in audio bluetooth moonlight chiaki browser; do
   rg -q '^Environment=PIPEWIRE_RUNTIME_DIR=/run/moonlightos$' "services/moonlightos-$unit.service"
 done
 rg -q '^d /run/moonlightos 0700 moonlightos moonlightos -$' overlay/etc/tmpfiles.d/moonlightos.conf
@@ -269,8 +270,10 @@ for required in \
   services/moonlightos-bluetooth.service \
   services/moonlightos-moonlight.service \
   services/moonlightos-chiaki.service \
-  services/moonlightos-firefox.service \
-  services/moonlightos-firefox.path \
+  services/moonlightos-browser.service \
+  services/moonlightos-browser.path \
+  services/moonlightos-browser-install.service \
+  services/moonlightos-browser-install.path \
   services/moonlightos-qemu-smoke.service \
   services/moonlightos-support-export.path \
   services/moonlightos-support-export.service \
@@ -283,6 +286,39 @@ for required in \
   services/moonlightos-tailscale-enroll.service; do
   test -s "$required"
 done
+
+rg -q 'THIRD_PARTY_NOTICES.md' build/configure.sh
+rg -q 'SOURCE_CODE.md' build/configure.sh
+rg -q 'debian-packages.tsv' config/live-build/hooks/live/0100-moonlightos.hook.chroot
+rg -q 'moonlight-6.1.0-source.tar.gz' build/sources.lock build/configure.sh
+rg -q 'chiaki-ng-1.10.0-source.tar.gz' build/sources.lock build/configure.sh
+
+browser_test=$(mktemp -d)
+printf 'none\n' > "$browser_test/request"
+MOONLIGHTOS_BROWSER_REQUEST="$browser_test/request" \
+MOONLIGHTOS_BROWSER_STATUS="$browser_test/status" \
+MOONLIGHTOS_BROWSER_STATE="$browser_test/state" \
+  bash scripts/moonlightos-browser-install
+grep -Fxq none "$browser_test/state"
+grep -Fxq 'selected: no default browser' "$browser_test/status"
+if MOONLIGHTOS_BROWSER_STATE="$browser_test/state" bash scripts/moonlightos-browser \
+  2> "$browser_test/browser-error"; then
+  echo 'Browser launcher ran with no selected browser.' >&2
+  exit 1
+else
+  [[ $? == 66 ]]
+fi
+grep -Fq 'Choose one in Settings' "$browser_test/browser-error"
+printf 'invalid\n' > "$browser_test/request"
+if MOONLIGHTOS_BROWSER_REQUEST="$browser_test/request" \
+  MOONLIGHTOS_BROWSER_STATUS="$browser_test/status" \
+  MOONLIGHTOS_BROWSER_STATE="$browser_test/state" \
+  bash scripts/moonlightos-browser-install; then
+  echo 'Invalid browser selection was accepted.' >&2
+  exit 1
+fi
+grep -q '^failed:' "$browser_test/status"
+find "$browser_test" -depth -delete
 
 tmp=$(mktemp -d)
 trap 'find "$tmp" -depth -delete' EXIT

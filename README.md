@@ -1,8 +1,8 @@
 # MoonlightOS v0.1.9
 
 MoonlightOS is a Debian 13 (Trixie) x86_64 gaming-streaming appliance. It boots
-directly into a small controller-friendly launcher for Moonlight, chiaki-ng,
-and Firefox ESR, with an allowlist-only Linux USB/IP server. It is not a
+directly into a small controller-friendly launcher for Moonlight and chiaki-ng,
+with an allowlist-only Linux USB/IP server. It is not a
 general-purpose desktop.
 
 > Testing status: source/static and QEMU application tests are automated. The
@@ -16,7 +16,7 @@ general-purpose desktop.
 - Intel i915, Mesa Vulkan, VA-API, and Intel media-driver packages
 - Cage as the direct DRM/KMS Wayland kiosk compositor; no desktop environment
 - Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned to fixed release URLs
-- Firefox ESR from Debian 13, running natively on Wayland with a persistent profile
+- optional Firefox ESR or Chromium installation selected by the owner from Settings
 - black-and-white full-screen terminal launcher with keyboard and common gamepad navigation
 - matching high-contrast UEFI/BIOS boot menus and dark text installer
 - controller-friendly Bluetooth management inside Settings, backed by BlueZ
@@ -30,7 +30,7 @@ general-purpose desktop.
 - controller-friendly display settings based only on modes advertised by Cage/wlroots
 - 15-second display-mode preview with confirmation, rollback, and display-identity-safe persistence
 - redacted support archives exported to validated writable removable media by a restricted system service
-- systemd crash recovery for the launcher, streaming applications, and Firefox
+- systemd crash recovery for the launcher, streaming applications, and selected browser
 - explicit USB/IP allowlist, hotplug reconciliation, and fail-closed TCP/3240
 - optional, unauthenticated-by-default Tailscale overlay and native Tailscale SSH
 - persistent settings and pairing data under `/var/lib/moonlightos`
@@ -57,8 +57,9 @@ build/out/moonlightos-0.1.9-amd64.iso
 `scripts/fetch-apps.sh` downloads only the fixed versions and HTTPS URLs in
 `build/applications.lock`. `build/configure.sh`
 extracts their pinned payloads into the read-only image so runtime FUSE is not
-required. Firefox is installed from Debian's signed repositories during the
-image build. No application binary is committed to Git.
+required. Browsers are not included in the ISO; the owner may install one
+directly from Debian's signed repositories. No application binary is committed
+to Git.
 
 ## First boot
 
@@ -104,7 +105,7 @@ display path are tested.
 | Network, host profiles, and Tailscale | `/var/lib/moonlightos/config.ini` |
 | Moonlight host list/pairing | `/var/lib/moonlightos/home/.config/` |
 | chiaki-ng registration | `/var/lib/moonlightos/home/.config/` |
-| Firefox profile, bookmarks, and settings | `/var/lib/moonlightos/home/.mozilla/` |
+| Browser choice and profile | `/var/lib/moonlightos/browser`, `/var/lib/moonlightos/home/` |
 | Launcher controller identity | `/var/lib/moonlightos/launcher-controller.id` |
 | Bluetooth power preference | `/var/lib/moonlightos/bluetooth-enabled` |
 | Application manifests and state | `/var/lib/moonlightos/apps.d/`, `/var/lib/moonlightos/apps-state.ini` |

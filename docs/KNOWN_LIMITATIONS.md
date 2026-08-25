@@ -13,6 +13,9 @@
 - The installed root filesystem is writable; A/B read-only updates are deferred.
 - Steam is not installed. `steam-devices` supplies controller device rules only;
   the documented Steam manifest is groundwork for a future supported install.
+- No browser is included in the ISO. Installing Firefox ESR or Chromium from
+  Settings requires a working network connection and writable installed or
+  persistent storage; choosing another default does not delete prior profiles.
 - The controller keyboard is a full-screen buffered utility, not a compositor overlay.
   Physical controller and text-injection validation remains required.
 - Custom command applications must already exist on the filesystem.

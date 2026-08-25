@@ -1,0 +1,10 @@
+[Unit]
+Description=Install the browser selected by the MoonlightOS owner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/moonlightos-browser-install
+StandardOutput=journal
+StandardError=journal

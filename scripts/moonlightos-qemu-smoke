@@ -148,6 +148,7 @@ systemctl stop moonlightos-moonlight.service
 systemctl start --no-block moonlightos-chiaki.service
 wait_for_file /run/moonlightos/chiaki-ng-ready chiaki-ng
 systemctl stop moonlightos-chiaki.service
-systemctl start --no-block moonlightos-firefox.service
-wait_for_file /run/moonlightos/firefox-ready Firefox
+test ! -x /usr/bin/firefox-esr
+test ! -x /usr/bin/chromium
+systemctl is-enabled --quiet moonlightos-browser-install.path
 echo MOONLIGHTOS_SMOKE_APPS_READY

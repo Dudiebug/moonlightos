@@ -47,7 +47,8 @@ timeout and serial settings before starting the VM.
 Success requires `MOONLIGHTOS_LAUNCHER_READY`, emitted only after foot presents
 the full-screen curses launcher. A QEMU-only firmware flag then starts the three
 production application services and requires `MOONLIGHTOS_APP_STARTED moonlight`,
-`MOONLIGHTOS_APP_STARTED chiaki-ng`, and `MOONLIGHTOS_APP_STARTED firefox`
+`MOONLIGHTOS_APP_STARTED chiaki-ng`; it also verifies that no browser is bundled
+and that the owner-triggered browser installer is available
 after each real application remains alive for five seconds. It also proves the
 Bluetooth control service handles an absent adapter and survives restarts of
 BlueZ and its own service without changing the launcher or audio-session PID
@@ -150,7 +151,7 @@ Applications and acceleration:
 - [ ] Pairing/configuration survives cold reboot
 - [ ] Closing Moonlight returns to the launcher
 - [ ] Closing chiaki-ng returns to the launcher
-- [ ] Closing Firefox returns to the launcher
+- [ ] Install the chosen browser from Settings; closing it returns to the launcher
 - [ ] Exit and Ctrl+D close Terminal and return to the launcher
 - [ ] Ctrl+C in Terminal, nmtui, diagnostics, and Tailscale does not interrupt the launcher
 - [ ] Guide/Home + X/Square opens the buffered keyboard over each supported application
@@ -187,7 +188,7 @@ Bluetooth (record every unperformed item as untested):
 - [ ] Confirm the launcher PID and restart count do not change
 - [ ] Launch and exit Moonlight after Bluetooth configuration
 - [ ] Launch and exit chiaki-ng after Bluetooth configuration
-- [ ] Launch and exit Firefox after Bluetooth configuration
+- [ ] Launch and exit the selected browser after Bluetooth configuration
 
 Installed systems retain BlueZ state under `/var/lib/bluetooth`. Live USB
 persistence must include that directory for pairings to survive reboot. Never
