@@ -6,7 +6,7 @@ Write the hybrid ISO to a whole USB device. **The selected device is erased.**
 Resolve the exact target with `lsblk` before running this example:
 
 ```bash
-sudo dd if=moonlightos-0.1.9-amd64.iso of=/dev/sdX bs=4M \
+sudo dd if=moonlightos-0.1.10-amd64.iso of=/dev/sdX bs=4M \
   status=progress conv=fsync
 ```
 
@@ -29,7 +29,7 @@ The boot menu provides:
 3. Choose `Install MoonlightOS` from the boot menu. The image includes Debian
    Installer in live mode; it copies the configured appliance system to the SSD.
 4. Select the 256 GB NVMe only. Guided partitioning with an EFI System
-   Partition and ext4 root is the v0.1.9 reference layout.
+   Partition and ext4 root is the v0.1.10 reference layout.
 5. Reboot, remove the USB, and confirm the MoonlightOS launcher appears.
 6. Run `moonlightos-diagnostics`, pair applications, reboot, and confirm the
    host lists remain.
@@ -45,7 +45,7 @@ USB device (not a partition), and try another USB port.
 Do not use a file-copy operation. If the boot menu appears but the launcher does
 not, photograph the last screen and include it in an issue.
 
-The installed root filesystem is writable in v0.1.9. Pairings, settings, and
+The installed root filesystem is writable in v0.1.10. Pairings, settings, and
 logs live beneath `/var/lib/moonlightos` and `/var/log/moonlightos`.
 
 The CI install smoke test performs a complete UEFI installation to a disposable
@@ -88,7 +88,7 @@ testing, keep the ISO and an ext4 backend labeled `persistence` on Ventoy's
 first partition:
 
 ```text
-ISO/moonlightos-0.1.9-amd64.iso
+ISO/moonlightos-0.1.10-amd64.iso
 persistence/moonlightos.dat
 ventoy/ventoy.json
 ```
@@ -99,7 +99,7 @@ ventoy/ventoy.json
 {
   "persistence": [
     {
-      "image": "/ISO/moonlightos-0.1.9-amd64.iso",
+      "image": "/ISO/moonlightos-0.1.10-amd64.iso",
       "backend": "/persistence/moonlightos.dat",
       "timeout": 0
     }

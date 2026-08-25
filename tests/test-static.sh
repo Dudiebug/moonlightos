@@ -64,17 +64,17 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.9 ]]
+[[ "$(< VERSION)" == 0.1.10 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.9-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
-rg -q 'cd build/out && sha256sum moonlightos-0\.1\.9-amd64\.iso' .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.10-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'cd build/out && sha256sum moonlightos-0\.1\.10-amd64\.iso' .github/workflows/build.yml
 rg -q 'sudo chown -R .*build/out' .github/workflows/build.yml
-rg -q '^  actions: read$' .github/workflows/release-v0.1.9.yml
-rg -q 'git/matching-refs/tags/0\.1\.9' .github/workflows/release-v0.1.9.yml
-rg -q 'docs/releases/v0\.1\.9\.md' .github/workflows/release-v0.1.9.yml
-rg -q -- '--draft' .github/workflows/release-v0.1.9.yml
-rg -q 'already public; refusing to replace its assets' .github/workflows/release-v0.1.9.yml
-! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.9.yml
+rg -q '^  actions: read$' .github/workflows/release-v0.1.10.yml
+rg -q 'git/matching-refs/tags/0\.1\.10' .github/workflows/release-v0.1.10.yml
+rg -q 'docs/releases/v0\.1\.10\.md' .github/workflows/release-v0.1.10.yml
+rg -q -- '--draft' .github/workflows/release-v0.1.10.yml
+rg -q 'already public; refusing to replace its assets' .github/workflows/release-v0.1.10.yml
+! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.10.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
