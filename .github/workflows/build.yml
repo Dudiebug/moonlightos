@@ -52,6 +52,6 @@ jobs:
       - name: Upload ISO
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.6-amd64
-          path: build/out/moonlightos-0.1.6-amd64.iso
+          name: moonlightos-0.1.7-amd64
+          path: build/out/moonlightos-0.1.7-amd64.iso
           if-no-files-found: error

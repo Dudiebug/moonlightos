@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Translate common gamepad navigation to keys only while the launcher is active."""
+"""Translate gamepad navigation and expose the global controller keyboard chord."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ from evdev import InputDevice, UInput, ecodes
 
 KEYS = [ecodes.KEY_UP, ecodes.KEY_DOWN, ecodes.KEY_LEFT, ecodes.KEY_RIGHT,
         ecodes.KEY_ENTER, ecodes.KEY_ESC]
+OSK_ACTIVE = pathlib.Path("/run/moonlightos/osk-active")
+START_OSK = pathlib.Path("/run/moonlightos/start-osk")
 _last_state_check = 0.0
 _last_state = False
 
@@ -64,6 +66,26 @@ def key_for_event(event) -> int | None:
     return None
 
 
+class KeyboardChord:
+    """Edge detector for Guide/Home + X/Square."""
+
+    def __init__(self) -> None:
+        self.pressed: set[int] = set()
+        self.latched = False
+
+    def update(self, event) -> bool:
+        if event.type != ecodes.EV_KEY:
+            return False
+        if event.value:
+            self.pressed.add(event.code)
+        else:
+            self.pressed.discard(event.code)
+        chord = {ecodes.BTN_MODE, ecodes.BTN_WEST} <= self.pressed
+        triggered = chord and not self.latched
+        self.latched = chord
+        return triggered
+
+
 def run() -> None:
     ui = UInput({ecodes.EV_KEY: KEYS}, name="MoonlightOS Launcher Navigation")
     while True:
@@ -71,15 +93,34 @@ def run() -> None:
         if dev is None:
             time.sleep(2)
             continue
+        chord = KeyboardChord()
+        grabbed = False
         try:
             for event in dev.read_loop():
-                if app_active():
+                active_osk = OSK_ACTIVE.exists()
+                if active_osk != grabbed:
+                    try:
+                        dev.grab() if active_osk else dev.ungrab()
+                        grabbed = active_osk
+                    except OSError:
+                        grabbed = False
+                if chord.update(event):
+                    if not active_osk:
+                        START_OSK.touch()
+                    continue
+                if app_active() and not active_osk:
                     continue
                 key = key_for_event(event)
                 if key:
                     emit(ui, key)
         except OSError:
             time.sleep(1)
+        finally:
+            if grabbed:
+                try:
+                    dev.ungrab()
+                except OSError:
+                    pass
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ class Codes:
     BTN_GAMEPAD = 304
     BTN_SOUTH = 304
     BTN_EAST = 305
+    BTN_WEST = 307
+    BTN_MODE = 316
     BTN_DPAD_UP = 544
     BTN_DPAD_DOWN = 545
     BTN_DPAD_LEFT = 546
@@ -54,6 +56,18 @@ class GamepadMappingTest(unittest.TestCase):
     def test_release_is_not_reemitted(self):
         release = SimpleNamespace(type=Codes.EV_KEY, value=0, code=Codes.BTN_SOUTH)
         self.assertIsNone(self.module.key_for_event(release))
+
+    def test_keyboard_chord_triggers_once_until_released(self):
+        chord = self.module.KeyboardChord()
+        mode = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.BTN_MODE)
+        west = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.BTN_WEST)
+        repeat = SimpleNamespace(type=Codes.EV_KEY, value=2, code=Codes.BTN_WEST)
+        release = SimpleNamespace(type=Codes.EV_KEY, value=0, code=Codes.BTN_WEST)
+        self.assertFalse(chord.update(mode))
+        self.assertTrue(chord.update(west))
+        self.assertFalse(chord.update(repeat))
+        self.assertFalse(chord.update(release))
+        self.assertTrue(chord.update(west))
 
 
 if __name__ == "__main__":

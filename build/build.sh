@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORK="$ROOT/build/work"
 OUT="$ROOT/build/out"
-ISO="$OUT/moonlightos-0.1.6-amd64.iso"
+ISO="$OUT/moonlightos-0.1.7-amd64.iso"
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'Run with sudo: sudo make build' >&2; exit 1; }
 command -v lb >/dev/null || { echo 'live-build is required (apt install live-build)' >&2; exit 1; }
@@ -18,7 +18,7 @@ lb config noauto \
   --distribution trixie \
   --architectures amd64 \
   --binary-images iso-hybrid \
-  --archive-areas 'main contrib non-free-firmware' \
+  --archive-areas 'main contrib non-free non-free-firmware' \
   --debian-installer live \
   --debian-installer-gui false \
   --uefi-secure-boot enable \

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-0.1.6-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.7-amd64.iso}
 SCREENSHOT=${MOONLIGHTOS_QEMU_SCREENSHOT:-/tmp/moonlightos-qemu-smoke.ppm}
 command -v qemu-system-x86_64 >/dev/null || { echo 'qemu-system-x86_64 is required' >&2; exit 127; }
 [[ -f "$ISO" ]] || { echo "ISO not found: $ISO" >&2; exit 66; }
@@ -124,6 +124,7 @@ fail() {
 
 wait_for_marker 'MOONLIGHTOS_LAUNCHER_READY' 180 || fail 'Launcher did not become ready.'
 capture_screen
+wait_for_marker 'MOONLIGHTOS_SMOKE_CONFIGURED_PLATFORM_READY' 30 || fail 'Configured applications, OSK, or setup-ready ordering failed.'
 wait_for_marker 'MOONLIGHTOS_SMOKE_USBIP_READY' 30 || fail 'USB/IP daemon did not remain active.'
 wait_for_marker 'MOONLIGHTOS_SMOKE_BLUETOOTH_READY' 30 || fail 'Bluetooth control service or launcher-survival check failed.'
 
@@ -135,4 +136,4 @@ capture_screen
 
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
-echo 'QEMU smoke test passed: launcher, Bluetooth, USB/IP, Moonlight, Chiaki-ng, and Firefox started.'
+echo 'QEMU smoke test passed: launcher/setup readiness, configured apps, OSK, Bluetooth, USB/IP, Moonlight, Chiaki-ng, and Firefox started.'

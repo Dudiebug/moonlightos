@@ -60,8 +60,10 @@ class FakeClient:
     def __init__(self, snapshots=()):
         self.snapshots = list(snapshots)
         self.requests = []
+        self.snapshot_calls = 0
 
     def snapshot(self):
+        self.snapshot_calls += 1
         if not self.snapshots:
             return dict(ADAPTER_ON)
         value = self.snapshots.pop(0)
@@ -126,13 +128,23 @@ class BluetoothMenuTest(unittest.TestCase):
         bluetooth.BluetoothMenu(screen, client).run()
         self.assertTrue(any("Wireless Controller" in value and "CONNECTED" in value for value in screen.drawn))
 
-    def test_scan_countdown_and_escape_stop_discovery(self):
-        screen = FakeScreen([27])
+    def test_scan_runs_until_escape_and_has_no_countdown(self):
+        screen = FakeScreen([-1] * 200 + [27])
         client = FakeClient([ADAPTER_ON])
-        bluetooth.BluetoothMenu(screen, client)._scan()
+        bluetooth.BluetoothMenu(screen, client).run()
         self.assertEqual(client.requests[0][0], "start_scan")
         self.assertEqual(client.requests[-1][0], "stop_scan")
+        self.assertGreater(client.snapshot_calls, 15)
         self.assertTrue(any("SCANNING" in value for value in screen.drawn))
+        self.assertFalse(any("15S" in value for value in screen.drawn))
+
+    def test_rescan_stops_then_starts_discovery(self):
+        screen = FakeScreen([10, 27])
+        client = FakeClient([ADAPTER_ON, ADAPTER_ON])
+        bluetooth.BluetoothMenu(screen, client).run()
+        commands = [command for command, _fields in client.requests]
+        self.assertEqual(commands[:3], ["start_scan", "stop_scan", "start_scan"])
+        self.assertEqual(commands[-1], "stop_scan")
 
     def test_pair_success_finishes_without_external_screen(self):
         completed = dict(

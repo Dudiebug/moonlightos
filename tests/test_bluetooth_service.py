@@ -160,9 +160,35 @@ class ControllerTest(unittest.TestCase):
             success()
 
         controller._call = call
+        controller.discovery_requested = True
         controller._begin_discovery(ADAPTER_PATH)
         self.assertEqual(methods, ["SetDiscoveryFilter", "StartDiscovery"])
-        self.assertEqual(controller.glib.timers[0][0], 15)
+        self.assertEqual(controller.glib.timers, [])
+
+    def test_start_scan_is_idempotent_while_start_is_pending(self):
+        controller = self.controller()
+        controller._call = mock.Mock()
+        controller.start_scan()
+        controller.start_scan()
+        self.assertEqual(controller._call.call_count, 1)
+
+    def test_start_scan_is_idempotent_when_already_discovering(self):
+        controller = self.controller()
+        controller.objects[ADAPTER_PATH][bluetoothd.ADAPTER]["Discovering"] = True
+        controller._call = mock.Mock()
+        controller.start_scan()
+        controller._call.assert_not_called()
+
+    def test_scan_restarts_after_rescan_stop_completes(self):
+        controller = self.controller()
+        controller.objects[ADAPTER_PATH][bluetoothd.ADAPTER]["Discovering"] = True
+        controller.stop_scan()
+        controller.start_scan()
+        controller._begin_discovery = mock.Mock()
+        controller.properties_changed(
+            bluetoothd.ADAPTER, {"Discovering": False}, [], path=ADAPTER_PATH
+        )
+        controller._begin_discovery.assert_called_once_with(ADAPTER_PATH)
 
     def test_pair_trusts_then_connects(self):
         controller = self.controller()

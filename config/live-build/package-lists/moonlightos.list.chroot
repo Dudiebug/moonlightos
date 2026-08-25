@@ -53,6 +53,7 @@ libspa-0.2-modules
 libspa-0.2-bluetooth
 joystick
 bluez
+steam-devices
 
 # USB/IP and diagnostics
 usbip
