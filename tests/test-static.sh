@@ -309,6 +309,27 @@ else
   [[ $? == 66 ]]
 fi
 grep -Fq 'Choose one in Settings' "$browser_test/browser-error"
+mkdir "$browser_test/bin"
+cat > "$browser_test/bin/apt-get" <<'EOF'
+#!/bin/bash
+set -Eeuo pipefail
+if [[ ${1:-} == install ]]; then
+  install -m 0755 /bin/true "$TEST_BROWSER_BIN/${*: -1}"
+fi
+EOF
+chmod 0755 "$browser_test/bin/apt-get"
+printf 'firefox-esr\n' > "$browser_test/request"
+PATH="$browser_test/bin:$PATH" TEST_BROWSER_BIN="$browser_test/bin" \
+MOONLIGHTOS_BROWSER_BIN_DIR="$browser_test/bin" \
+MOONLIGHTOS_BROWSER_REQUEST="$browser_test/request" \
+MOONLIGHTOS_BROWSER_STATUS="$browser_test/status" \
+MOONLIGHTOS_BROWSER_STATE="$browser_test/state" \
+  bash scripts/moonlightos-browser-install
+grep -Fxq firefox-esr "$browser_test/state"
+grep -Fxq 'installed: firefox-esr' "$browser_test/status"
+MOONLIGHTOS_BROWSER_BIN_DIR="$browser_test/bin" \
+MOONLIGHTOS_BROWSER_STATE="$browser_test/state" \
+  bash scripts/moonlightos-browser
 printf 'invalid\n' > "$browser_test/request"
 if MOONLIGHTOS_BROWSER_REQUEST="$browser_test/request" \
   MOONLIGHTOS_BROWSER_STATUS="$browser_test/status" \

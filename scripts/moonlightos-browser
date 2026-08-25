@@ -2,9 +2,10 @@
 set -Eeuo pipefail
 
 state=${MOONLIGHTOS_BROWSER_STATE:-/var/lib/moonlightos/browser}
+bin_dir=${MOONLIGHTOS_BROWSER_BIN_DIR:-/usr/bin}
 selection=$(head -n 1 "$state" 2>/dev/null || true)
 case "$selection" in
-  firefox-esr) exec /usr/bin/firefox-esr "$@" ;;
-  chromium) exec /usr/bin/chromium --ozone-platform=wayland "$@" ;;
+  firefox-esr) exec "$bin_dir/firefox-esr" "$@" ;;
+  chromium) exec "$bin_dir/chromium" --ozone-platform=wayland "$@" ;;
   *) echo 'No browser is selected. Choose one in Settings.' >&2; exit 66 ;;
 esac
