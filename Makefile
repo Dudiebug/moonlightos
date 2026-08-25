@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 ISO := build/out/moonlightos-0.1.8-amd64.iso
 
-.PHONY: help fetch-apps configure build test qemu-smoke qemu-install-smoke clean
+.PHONY: help fetch-apps configure build test qemu-smoke qemu-persistence-smoke qemu-install-smoke clean
 
 help:
 	@printf '%s\n' \
@@ -12,6 +12,7 @@ help:
 	  'sudo make build  Build the Debian 13 hybrid ISO' \
 	  'make test         Run source/static tests' \
 	  'make qemu-smoke   Boot the ISO and wait for the appliance marker' \
+	  'make qemu-persistence-smoke  Verify live persistence and recovery boot' \
 	  'make qemu-install-smoke  Install to a VM disk and boot it independently' \
 	  'sudo make clean   Remove generated build state'
 
@@ -35,6 +36,9 @@ test:
 
 qemu-smoke:
 	./tests/qemu-smoke.sh "$(ISO)"
+
+qemu-persistence-smoke:
+	./tests/qemu-persistence-smoke.sh "$(ISO)"
 
 qemu-install-smoke:
 	./tests/qemu-install-smoke.sh "$(ISO)"

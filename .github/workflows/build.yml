@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes curl ca-certificates cpio debootstrap \
-            debian-archive-keyring xorriso squashfs-tools grub-pc-bin \
+            debian-archive-keyring e2fsprogs xorriso squashfs-tools grub-pc-bin \
             grub-efi-amd64-bin mtools dosfstools qemu-system-x86 ovmf ripgrep
           curl --fail --location --output /tmp/live-build.deb \
             https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
@@ -49,6 +49,10 @@ jobs:
         env:
           MOONLIGHTOS_QEMU_INSTALL_LOG: /tmp/moonlightos-qemu-install.log
           MOONLIGHTOS_QEMU_INSTALLED_BOOT_LOG: /tmp/moonlightos-qemu-installed-boot.log
+      - name: QEMU persistence smoke test
+        run: make qemu-persistence-smoke
+        env:
+          MOONLIGHTOS_QEMU_PERSISTENCE_LOG: /tmp/moonlightos-qemu-persistence.log
       - name: Upload failed boot diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -59,6 +63,7 @@ jobs:
             /tmp/moonlightos-qemu-smoke.ppm
             /tmp/moonlightos-qemu-install.log
             /tmp/moonlightos-qemu-installed-boot.log
+            /tmp/moonlightos-qemu-persistence.log
           if-no-files-found: warn
           retention-days: 2
       - name: Upload ISO

@@ -28,6 +28,37 @@ case $mode in
     echo MOONLIGHTOS_SMOKE_PERSISTENCE_READY
     exit 0
     ;;
+  live-persistence-write)
+    printf '\n[qemu-smoke]\nlive_persistence = verified\n' >> /var/lib/moonlightos/config.ini
+    install -D -m 0640 /dev/null /var/lib/moonlightos/home/.config/moonlight-qemu/state
+    install -D -m 0640 /dev/null /var/lib/moonlightos/home/.config/chiaki-qemu/state
+    install -D -m 0600 /dev/null /var/lib/tailscale/qemu-state
+    install -D -m 0600 /dev/null /var/lib/bluetooth/qemu-state
+    install -D -m 0640 /dev/null /var/log/moonlightos/qemu-state
+    sync
+    echo MOONLIGHTOS_SMOKE_LIVE_PERSISTENCE_WRITTEN
+    exit 0
+    ;;
+  live-persistence-read)
+    grep -Fxq 'live_persistence = verified' /var/lib/moonlightos/config.ini
+    test -f /var/lib/moonlightos/home/.config/moonlight-qemu/state
+    test -f /var/lib/moonlightos/home/.config/chiaki-qemu/state
+    test -f /var/lib/tailscale/qemu-state
+    test -f /var/lib/bluetooth/qemu-state
+    test -f /var/log/moonlightos/qemu-state
+    echo MOONLIGHTOS_SMOKE_LIVE_PERSISTENCE_READY
+    exit 0
+    ;;
+  live-persistence-absent)
+    ! grep -Fxq 'live_persistence = verified' /var/lib/moonlightos/config.ini
+    test ! -e /var/lib/moonlightos/home/.config/moonlight-qemu/state
+    test ! -e /var/lib/moonlightos/home/.config/chiaki-qemu/state
+    test ! -e /var/lib/tailscale/qemu-state
+    test ! -e /var/lib/bluetooth/qemu-state
+    test ! -e /var/log/moonlightos/qemu-state
+    echo MOONLIGHTOS_SMOKE_LIVE_PERSISTENCE_IGNORED
+    exit 0
+    ;;
   apps) ;;
   *) exit 0 ;;
 esac

@@ -86,10 +86,21 @@ qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
 After reboot, verify launcher/app exit/crash recovery and confirm the saved
 `/var/lib/moonlightos/config.ini` values remain unchanged.
 
-The automated test proves UEFI installation, an independent installed boot,
-and configuration persistence across a cold reboot.
-It does not prove physical NVMe, USB destination selection, Rufus, Ventoy, or
-live-persistence behavior.
+The automated install test proves UEFI installation, an independent installed
+boot, and configuration persistence across a cold reboot. It does not prove
+physical NVMe, USB destination selection, Rufus, or Ventoy behavior.
+
+## Live-persistence QEMU smoke test
+
+```bash
+make qemu-persistence-smoke
+```
+
+This test creates an ext4 backend with the documented `persistence.conf`, boots
+the release ISO twice, and verifies MoonlightOS, Moonlight, chiaki-ng,
+Tailscale, BlueZ, and log state across reboot. A third boot passes
+`nopersistence` while the same backend remains attached and verifies that none
+of its test state is visible.
 
 ## Deployment-mode checklist
 
@@ -99,9 +110,9 @@ live-persistence behavior.
 - [x] Installed virtual disk boots without the ISO and reaches the launcher
 - [x] Installed virtual-disk configuration survives a cold reboot
 - [x] Live boot without a persistence device
-- [ ] Live persistence survives reboot for Moonlight, chiaki-ng, Tailscale,
+- [x] Live persistence survives reboot for Moonlight, chiaki-ng, Tailscale,
       and BlueZ state
-- [ ] `No Persistence` ignores an existing persistence backend
+- [x] `No Persistence` ignores an existing persistence backend
 - [ ] Invalid and full persistence backends fail diagnostically
 - [ ] Rufus DD/Image-mode USB boot on physical UEFI hardware
 - [ ] Ventoy normal-mode live boot and installer entry

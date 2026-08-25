@@ -97,6 +97,9 @@ rg -q 'chiaki-ng-ready' scripts/moonlightos-qemu-smoke
 rg -q 'firefox-ready' scripts/moonlightos-qemu-smoke
 rg -q 'systemctl start --no-block moonlightos-firefox.service' scripts/moonlightos-qemu-smoke
 rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
+rg -q 'qemu-persistence-smoke' Makefile .github/workflows/build.yml
+rg -q 'live-persistence-write' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh
+rg -q 'live-persistence-absent' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh
 rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-smoke.service
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot
