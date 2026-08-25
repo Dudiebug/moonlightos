@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-0.1.9-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.10-amd64.iso}
 INSTALL_LOG=${MOONLIGHTOS_QEMU_INSTALL_LOG:-/tmp/moonlightos-qemu-install.log}
 BOOT_LOG=${MOONLIGHTOS_QEMU_INSTALLED_BOOT_LOG:-/tmp/moonlightos-qemu-installed-boot.log}
 MENU_SCREENSHOT=${MOONLIGHTOS_QEMU_INSTALL_MENU_SCREENSHOT:-/tmp/moonlightos-qemu-install-menu.ppm}
