@@ -17,7 +17,7 @@ MUTANTS = (
         'commands = [("sendkey home", 0.25)] * 60\n    commands += [("sendkey down", 0.15)] * 2',
     ),
     (
-        "skip editor line movement",
+        "skip required second editor line movement",
         '("sendkey down", 0.5),\n        ("sendkey end", 0.1),',
         '("sendkey end", 0.1),',
     ),

@@ -24,12 +24,13 @@ class QemuIsoBootTests(unittest.TestCase):
         )
 
         names = [command for command, _delay in commands]
-        self.assertEqual(names.count("sendkey down"), 4)
+        self.assertEqual(names.count("sendkey down"), 5)
         self.assertGreaterEqual(commands[names.index("sendkey e")][1], 2.0)
         self.assertGreaterEqual(commands[names.index("sendkey e") + 1][1], 0.5)
+        self.assertGreaterEqual(commands[names.index("sendkey e") + 2][1], 0.5)
         self.assertEqual(
             names[names.index("sendkey e") + 1 : names.index("sendkey end") + 1],
-            ["sendkey down", "sendkey end"],
+            ["sendkey down", "sendkey down", "sendkey end"],
         )
         self.assertIn("screendump /tmp/menu.ppm", names)
         self.assertIn("screendump /tmp/editor.ppm", names)

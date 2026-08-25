@@ -61,6 +61,7 @@ def install_commands(
         (f"screendump {menu_screenshot}", 0.5),
         ("sendkey e", 2.0),
         ("sendkey down", 0.5),
+        ("sendkey down", 0.5),
         ("sendkey end", 0.1),
     ]
     commands += [(f"sendkey {key}", 0.03) for key in keys_for_text(kernel_append)]
