@@ -28,7 +28,12 @@ if command -v xorriso >/dev/null; then
   temporary_files+=("$boot_extract")
   grub_cfg=$boot_extract/grub.cfg
   xorriso -osirrox on -indev "$ISO" -extract /boot/grub/grub.cfg "$grub_cfg" >/dev/null 2>&1
-  [[ $(stat -c %a "$grub_cfg") == 555 ]] || { echo 'ISO GRUB config lost its executable mode' >&2; exit 65; }
+  grub_listing=$(xorriso -indev "$ISO" \
+    -find /boot/grub/grub.cfg -exec lsdl -- 2>/dev/null)
+  grep -q '^-r-xr-xr-x' <<< "$grub_listing" || {
+    printf 'ISO GRUB config lost mode 0555: %s\n' "$grub_listing" >&2
+    exit 65
+  }
   grep -q '^set default=0$' "$grub_cfg" || { echo 'ISO GRUB config lacks the default entry' >&2; exit 65; }
   grep -q '^set timeout=3$' "$grub_cfg" || { echo 'ISO GRUB config lacks the appliance timeout' >&2; exit 65; }
   grep -q '^serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial setup' >&2; exit 65; }

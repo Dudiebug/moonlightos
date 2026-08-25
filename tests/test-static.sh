@@ -11,7 +11,8 @@ command -v rg >/dev/null || {
 
 while IFS= read -r file; do
   bash -n "$file"
-done < <(rg -l '^#!/bin/bash' build host scripts tests usbip config/live-build/hooks)
+done < <(rg -l -g '!build/work/**' -g '!build/out/**' '^#!/bin/bash' \
+  build host scripts tests usbip config/live-build/hooks)
 
 boot_test=$(mktemp -d)
 mkdir -p "$boot_test/binary/boot/grub" "$boot_test/binary/isolinux"
@@ -22,6 +23,7 @@ printf 'include menu.cfg\nprompt 0\ntimeout 0\n' > "$boot_test/binary/isolinux/i
 printf 'label live-amd64\n menu label ^Live system (amd64)\n menu default\n linux /live/vmlinuz\n initrd /live/initrd.img\n append boot=live components persistence ipv6.disable=1\n' > "$boot_test/binary/isolinux/live.cfg"
 printf 'label installstart\n menu label Start ^installer\n linux /install/vmlinuz\n initrd /install/initrd.gz\n append vga=788 ipv6.disable=1 --- quiet\nlabel rescue\n append rescue/enable=true vga=788 ipv6.disable=1 --- quiet\n' > "$boot_test/binary/isolinux/install.cfg"
 printf 'menu background splash.png\nmenu color sel * #ffffffff #76a1d0ff *\nmenu color help 37;40 #ffdddd00 #00000000 none\n' > "$boot_test/binary/isolinux/stdmenu.cfg"
+chmod 0555 "$boot_test/binary/boot/grub/grub.cfg"
 grub_mode=$(stat -c %a "$boot_test/binary/boot/grub/grub.cfg")
 isolinux_mode=$(stat -c %a "$boot_test/binary/isolinux/live.cfg")
 grub_installer_args=$(rg '^[[:space:]]+linux /install/' "$boot_test/binary/boot/grub/install_start.cfg")
@@ -44,6 +46,7 @@ rg -q '^set color_normal=white/black$' "$boot_test/binary/boot/grub/theme.cfg"
 rg -q '^set color_highlight=black/white$' "$boot_test/binary/boot/grub/theme.cfg"
 ! rg -q '^set theme=' "$boot_test/binary/boot/grub/theme.cfg"
 [[ $(stat -c %a "$boot_test/binary/boot/grub/grub.cfg") == "$grub_mode" ]]
+rg -q 'chmod 0555 "\$output"' "$ROOT/config/live-build/hooks/live/0100-autoboot.hook.binary"
 [[ $(stat -c %a "$boot_test/binary/isolinux/live.cfg") == "$isolinux_mode" ]]
 rg -q '^timeout 30$' "$boot_test/binary/isolinux/isolinux.cfg"
 ! rg -q '^timeout 0$' "$boot_test/binary/isolinux/isolinux.cfg"
@@ -133,7 +136,8 @@ rg -q 'bluetooth.service moonlightos-bluetooth.service' config/live-build/hooks/
 rg -q '^PathExists=/run/moonlightos/support-export.request$' services/moonlightos-support-export.path
 rg -q '^ExecStart=/usr/libexec/moonlightos-support-export$' services/moonlightos-support-export.service
 removed_feature='TRIPLE[- ]?TAP|triple[- ]?tap|escape''-guard|stop''-active-app'
-! rg -q -g '!tests/test-static.sh' "$removed_feature" launcher scripts services build config docs tests
+! rg -q -g '!build/work/**' -g '!build/out/**' -g '!tests/test-static.sh' \
+  "$removed_feature" launcher scripts services build config docs tests
 rg -q 'EXIT THE APP TO RETURN' launcher/moonlightos-launcher.py
 rg -q 'WILL MOUNT TEMPORARILY' launcher/moonlightos_support.py
 rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale.*-\/var\/lib\/bluetooth' services/moonlightos-support-export.service

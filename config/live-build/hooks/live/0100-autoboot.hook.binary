@@ -25,7 +25,7 @@ while IFS= read -r -d '' cfg; do
     }
     !capture { print }
   ' "$cfg" > "$output"
-  chmod --reference="$cfg" "$output"
+  chmod 0555 "$output"
   mv "$output" "$cfg"
 done < <(find . -type f -path '*/boot/grub/grub.cfg' -print0)
 
