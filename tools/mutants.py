@@ -18,7 +18,7 @@ MUTANTS = (
     ),
     (
         "skip editor line movement",
-        '("sendkey down", 0.1),\n        ("sendkey end", 0.1),',
+        '("sendkey down", 0.5),\n        ("sendkey end", 0.1),',
         '("sendkey end", 0.1),',
     ),
     (
@@ -34,6 +34,11 @@ MUTANTS = (
 )
 
 
+def clear_bytecode() -> None:
+    for cache in (TARGET.parent / "__pycache__").glob("qemu_iso_boot.*.pyc"):
+        cache.unlink()
+
+
 def main() -> int:
     original = TARGET.read_text(encoding="utf-8")
     killed = 0
@@ -42,6 +47,7 @@ def main() -> int:
             if original.count(before) != 1:
                 raise RuntimeError(f"mutation anchor is not unique: {name}")
             TARGET.write_text(original.replace(before, after), encoding="utf-8")
+            clear_bytecode()
             result = subprocess.run(
                 [sys.executable, "-m", "unittest", "-q", "tests/test_qemu_iso_boot.py"],
                 cwd=ROOT,
@@ -53,8 +59,10 @@ def main() -> int:
                 killed += 1
                 print(f"killed: {name}")
             TARGET.write_text(original, encoding="utf-8")
+            clear_bytecode()
     finally:
         TARGET.write_text(original, encoding="utf-8")
+        clear_bytecode()
 
     print(f"manual mutation: {killed}/{len(MUTANTS)} killed")
     return 0 if killed == len(MUTANTS) else 1

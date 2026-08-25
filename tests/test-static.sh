@@ -186,6 +186,7 @@ rg -q 'lsblk --fs' scripts/moonlightos-qemu-smoke
 rg -q '^[[:space:]]*blkid$' scripts/moonlightos-qemu-smoke
 rg -q '^release-gauntlet:' Makefile
 rg -q 'python3 tools/mutants.py' tools/release-gauntlet.sh
+rg -q 'clear_bytecode' tools/mutants.py
 rg -q 'make qemu-install-smoke' tools/release-gauntlet.sh
 rg -q 'NRestarts' scripts/moonlightos-qemu-smoke
 rg -q 'moonlightos-audio.service' scripts/moonlightos-qemu-smoke
