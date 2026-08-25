@@ -1,2 +1,6 @@
 # name|version-or-date|url|download filename
 tailscale-archive-keyring|2026-08-20|https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg|tailscale-archive-keyring.gpg
+moonlight-license|6.1.0|https://raw.githubusercontent.com/moonlight-stream/moonlight-qt/v6.1.0/LICENSE|moonlight-GPL-3.0.txt
+moonlight-source|6.1.0|https://github.com/moonlight-stream/moonlight-qt/archive/refs/tags/v6.1.0.tar.gz|moonlight-6.1.0-source.tar.gz
+chiaki-ng-license|1.10.0|https://raw.githubusercontent.com/streetpea/chiaki-ng/v1.10.0/LICENSES/AGPL-3.0-only-OpenSSL.txt|chiaki-ng-AGPL-3.0-OpenSSL.txt
+chiaki-ng-source|1.10.0|https://github.com/streetpea/chiaki-ng/archive/refs/tags/v1.10.0.tar.gz|chiaki-ng-1.10.0-source.tar.gz

@@ -27,6 +27,7 @@ SOURCE_MANIFESTS = pathlib.Path(__file__).resolve().parents[1] / "config/apps.d"
 FIXED_CONTROLS = (("SETTINGS", "settings"), ("REBOOT", "reboot"), ("SHUTDOWN", "poweroff"))
 SETTINGS_MENU = (
     "BLUETOOTH",
+    "BROWSER",
     "APPLICATIONS",
     "SETUP WIZARD",
     "RESOLUTION",
@@ -40,6 +41,14 @@ SPINNER = "|/-\\"
 SUPPORT_EXPORT_TIMEOUT = 180.0
 SUPPORT_EXPORT_START_TIMEOUT = 12.0
 SUPPORT_EXPORT_POLL_MS = 100
+BROWSER_STATE = pathlib.Path("/var/lib/moonlightos/browser")
+BROWSER_REQUEST = RUN / "browser-install.request"
+BROWSER_STATUS = RUN / "browser-install.status"
+BROWSERS = (
+    ("NO DEFAULT BROWSER", "none"),
+    ("FIREFOX ESR (DEBIAN)", "firefox-esr"),
+    ("CHROMIUM (DEBIAN)", "chromium"),
+)
 
 
 def application_result() -> apps.LoadResult:
@@ -191,6 +200,14 @@ def tailscale_summary() -> str:
     except (OSError, subprocess.SubprocessError):
         return "TAILSCALE DISCONNECTED"
     return "TAILSCALE CONNECTED" if result.returncode == 0 else "TAILSCALE DISCONNECTED"
+
+
+def browser_summary() -> str:
+    try:
+        selected = BROWSER_STATE.read_text(encoding="ascii").strip()
+    except OSError:
+        selected = "none"
+    return dict((value, label) for label, value in BROWSERS).get(selected, "NO DEFAULT BROWSER")
 
 
 def add_centered(screen: curses.window, row: int, text: str) -> None:
@@ -407,6 +424,7 @@ class Launcher:
             "moonlight": lambda: self.launch_by_id("moonlight"),
             "chiaki-ng": lambda: self.launch_by_id("chiaki-ng"),
             "tailscale": lambda: self.launch_by_id("tailscale"),
+            "browser": settings.run_browser,
             "applications": settings.run_applications,
         }
         statuses = {
@@ -418,6 +436,7 @@ class Launcher:
             "moonlight": lambda: configuration_summary("moonlight"),
             "chiaki-ng": lambda: configuration_summary("chiaki"),
             "tailscale": tailscale_summary,
+            "browser": browser_summary,
             "applications": lambda: f"{len(application_result().applications)} APPLICATIONS CONFIGURED",
         }
         setup.SetupWizard(self.screen, actions, statuses).run(force=force)
@@ -510,6 +529,7 @@ class Settings:
             resolution = self.resolution or "UNAVAILABLE"
             rows = [
                 "BLUETOOTH",
+                "BROWSER",
                 "APPLICATIONS",
                 "SETUP WIZARD",
                 f"RESOLUTION                 {resolution}",
@@ -769,14 +789,48 @@ class Settings:
         finally:
             self.screen.timeout(1000)
 
+    def run_browser(self) -> None:
+        try:
+            current = BROWSER_STATE.read_text(encoding="ascii").strip()
+        except OSError:
+            current = "none"
+        chosen = self.choose("CHOOSE BROWSER", list(BROWSERS), current)
+        if not isinstance(chosen, str) or chosen == current:
+            return
+        try:
+            BROWSER_STATUS.unlink(missing_ok=True)
+            apps.atomic_write(BROWSER_REQUEST, f"{chosen}\n", mode=0o600)
+        except OSError as error:
+            self.status = f"BROWSER REQUEST FAILED: {error}"
+            return
+        self.status = "INSTALLING BROWSER FROM DEBIAN..." if chosen != "none" else "CLEARING DEFAULT BROWSER..."
+        deadline = time.monotonic() + 600
+        while time.monotonic() < deadline:
+            self.draw("BROWSER", [self.status], None)
+            try:
+                result = BROWSER_STATUS.read_text(encoding="utf-8").strip()
+            except OSError:
+                result = ""
+            if result.startswith(("installed:", "selected:")):
+                self.status = result.upper()
+                self.launcher.reload_applications()
+                return
+            if result.startswith("failed:"):
+                self.status = result.upper()
+                return
+            read_key(self.screen)
+        self.status = "BROWSER INSTALL TIMED OUT"
+
     def activate(self) -> bool:
         if self.selected == 0:
             bluetooth.run_bluetooth(self.screen)
         elif self.selected == 1:
-            self.run_applications()
+            self.run_browser()
         elif self.selected == 2:
-            self.launcher.setup_wizard(force=True)
+            self.run_applications()
         elif self.selected == 3:
+            self.launcher.setup_wizard(force=True)
+        elif self.selected == 4:
             resolutions = self.resolutions()
             chosen = self.choose("RESOLUTION", [(item, item) for item in resolutions], self.resolution)
             if isinstance(chosen, str):
@@ -784,7 +838,7 @@ class Settings:
                 rates = self.refresh_rates()
                 if self.refresh_mhz not in rates and rates:
                     self.refresh_mhz = rates[0]
-        elif self.selected == 4:
+        elif self.selected == 5:
             rates = self.refresh_rates()
             choices = [
                 (f"{value / 1000:g} HZ", value)
@@ -793,11 +847,11 @@ class Settings:
             chosen = self.choose("REFRESH RATE", choices, self.refresh_mhz)
             if isinstance(chosen, int):
                 self.refresh_mhz = chosen
-        elif self.selected == 5:
-            self.apply_preview()
         elif self.selected == 6:
-            self.generate_support_file()
+            self.apply_preview()
         elif self.selected == 7:
+            self.generate_support_file()
+        elif self.selected == 8:
             self.launcher.launch_by_id("system-diagnostics")
         else:
             return False
@@ -817,7 +871,7 @@ class Settings:
             if key not in (curses.KEY_ENTER, 10, 13):
                 continue
             old = self.selected
-            self.selected = selected + 3
+            self.selected = selected + 4
             self.activate()
             self.selected = old
 
@@ -961,7 +1015,7 @@ class ApplicationsSettings:
             self._write_user(
                 apps.Application(
                     id=app_id, name=name.strip().upper(), kind="command",
-                    command="/usr/bin/firefox-esr", arguments=shlex.join(["--kiosk", url]),
+                    command="/usr/bin/moonlightos-browser", arguments=shlex.join(["--kiosk", url]),
                     status_id=app_id, order=order,
                     environment={"MOZ_ENABLE_WAYLAND": "1"},
                 )

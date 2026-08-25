@@ -60,7 +60,7 @@ class LauncherTest(unittest.TestCase):
         launcher = self.launcher()
         self.assertEqual(
             [label for label, _action in launcher.menu],
-            ["MOONLIGHT", "CHIAKI-NG", "FIREFOX", "TERMINAL", "TAILSCALE", "SETTINGS", "REBOOT", "SHUTDOWN"],
+            ["MOONLIGHT", "CHIAKI-NG", "BROWSER", "TERMINAL", "TAILSCALE", "SETTINGS", "REBOOT", "SHUTDOWN"],
         )
 
     def test_custom_order_and_disabled_visibility(self):
@@ -146,9 +146,18 @@ class LauncherTest(unittest.TestCase):
         launcher.setup_wizard.assert_called_once_with()
 
     def test_settings_contains_applications_and_setup(self):
+        self.assertIn("BROWSER", self.module.SETTINGS_MENU)
         self.assertIn("APPLICATIONS", self.module.SETTINGS_MENU)
         self.assertIn("SETUP WIZARD", self.module.SETTINGS_MENU)
         self.assertFalse(hasattr(self.module.Launcher, "terminal_command"))
+
+    def test_browser_summary_defaults_to_none_and_reads_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory) / "browser"
+            with mock.patch.object(self.module, "BROWSER_STATE", state):
+                self.assertEqual(self.module.browser_summary(), "NO DEFAULT BROWSER")
+                state.write_text("chromium\n")
+                self.assertEqual(self.module.browser_summary(), "CHROMIUM (DEBIAN)")
 
     def test_progress_helpers(self):
         self.assertEqual(len(self.module.indeterminate_progress_bar(24, 0)), 24)

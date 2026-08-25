@@ -20,9 +20,9 @@ case "$APP" in
     appdir=/opt/moonlightos/apps/chiaki-ng
     binary=$appdir/usr/bin/chiaki
     ;;
-  firefox)
-    request=/run/moonlightos/start-firefox
-    binary=/usr/bin/firefox-esr
+  browser)
+    request=/run/moonlightos/start-browser
+    binary=/usr/bin/moonlightos-browser
     ;;
   *)
     echo "Unknown application: $APP" >&2

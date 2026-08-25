@@ -1,0 +1,9 @@
+[Unit]
+Description=Start the selected browser when requested by the launcher
+
+[Path]
+PathExists=/run/moonlightos/start-browser
+Unit=moonlightos-browser.service
+
+[Install]
+WantedBy=graphical.target

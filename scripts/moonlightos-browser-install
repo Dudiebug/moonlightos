@@ -1,0 +1,37 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+request=${MOONLIGHTOS_BROWSER_REQUEST:-/run/moonlightos/browser-install.request}
+status=${MOONLIGHTOS_BROWSER_STATUS:-/run/moonlightos/browser-install.status}
+state=${MOONLIGHTOS_BROWSER_STATE:-/var/lib/moonlightos/browser}
+bin_dir=${MOONLIGHTOS_BROWSER_BIN_DIR:-/usr/bin}
+
+write_status() {
+  printf '%s\n' "$1" > "$status"
+  chmod 0644 "$status"
+}
+trap 'write_status "failed: browser installation failed"; rm -f -- "$request"' ERR
+
+selection=$(head -n 1 "$request" 2>/dev/null || true)
+rm -f -- "$request"
+case "$selection" in
+  none)
+    printf '%s\n' none > "$state"
+    chmod 0644 "$state"
+    write_status 'selected: no default browser'
+    ;;
+  firefox-esr|chromium)
+    write_status "installing: $selection"
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends "$selection"
+    binary=$bin_dir/$selection
+    [[ -x $binary ]]
+    printf '%s\n' "$selection" > "$state"
+    chmod 0644 "$state"
+    write_status "installed: $selection"
+    ;;
+  *)
+    write_status 'failed: invalid browser selection'
+    exit 64
+    ;;
+esac

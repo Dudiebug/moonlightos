@@ -20,6 +20,7 @@ STEPS = (
     ("moonlight", "MOONLIGHT", "OPEN MOONLIGHT"),
     ("chiaki-ng", "CHIAKI-NG", "OPEN CHIAKI-NG"),
     ("tailscale", "TAILSCALE", "OPEN TAILSCALE SETUP"),
+    ("browser", "BROWSER", "CHOOSE BROWSER"),
     ("applications", "OPTIONAL APPS", "OPEN APPLICATIONS"),
 )
 
@@ -135,7 +136,7 @@ class SetupWizard:
                 step_id, title, action_label = STEPS[index]
                 choices = self.controls(action_label)
                 selected = self.choose(
-                    f"SETUP {index + 2}/11  ·  {title}", [self.status(step_id)], choices
+                    f"SETUP {index + 2}/{len(STEPS) + 2}  ·  {title}", [self.status(step_id)], choices
                 )
                 if selected is None:
                     index = max(0, index - 1)
@@ -159,7 +160,7 @@ class SetupWizard:
                     index += 1
 
             finish = self.choose(
-                "SETUP 11/11  ·  FINISH",
+                f"SETUP {len(STEPS) + 2}/{len(STEPS) + 2}  ·  FINISH",
                 ["SETUP CAN BE RERUN FROM SETTINGS."],
                 ["BACK", "FINISH"],
             )

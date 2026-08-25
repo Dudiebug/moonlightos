@@ -25,7 +25,7 @@ class ApplicationsTest(unittest.TestCase):
     def test_system_apps_load_in_stable_default_order(self):
         result = self.load()
         visible = [app.id for app in result.applications if app.visible]
-        self.assertEqual(visible, ["moonlight", "chiaki-ng", "firefox", "terminal", "tailscale"])
+        self.assertEqual(visible, ["moonlight", "chiaki-ng", "browser", "terminal", "tailscale"])
         self.assertEqual(result.errors, ())
 
     def test_user_app_and_state_overrides_load(self):

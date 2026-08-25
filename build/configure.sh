@@ -34,6 +34,8 @@ install -D -m 0755 "$ROOT/scripts/moonlightos-bluetoothd" "$CHROOT/usr/libexec/m
 install -D -m 0755 "$ROOT/scripts/moonlightos-osk-session" "$CHROOT/usr/libexec/moonlightos-osk-session"
 install -D -m 0755 "$ROOT/scripts/moonlightos-tailscale-ui" "$CHROOT/usr/bin/moonlightos-tailscale-ui"
 install -D -m 0755 "$ROOT/scripts/moonlightos-run-app" "$CHROOT/usr/libexec/moonlightos-run-app"
+install -D -m 0755 "$ROOT/scripts/moonlightos-browser-install" "$CHROOT/usr/libexec/moonlightos-browser-install"
+install -D -m 0755 "$ROOT/scripts/moonlightos-browser" "$CHROOT/usr/bin/moonlightos-browser"
 install -D -m 0755 "$ROOT/scripts/moonlightos-qemu-smoke" "$CHROOT/usr/libexec/moonlightos-qemu-smoke"
 install -D -m 0755 "$ROOT/scripts/moonlightos-support-export" "$CHROOT/usr/libexec/moonlightos-support-export"
 install -D -m 0755 "$ROOT/scripts/moonlightos-diagnostics" "$CHROOT/usr/bin/moonlightos-diagnostics"
@@ -52,6 +54,19 @@ install -D -m 0644 "$ROOT/build/applications.lock" \
   "$CHROOT/usr/share/moonlightos/applications.lock"
 install -D -m 0644 "$ROOT/build/sources.lock" \
   "$CHROOT/usr/share/moonlightos/sources.lock"
+install -D -m 0644 "$ROOT/LICENSE" "$CHROOT/usr/share/doc/moonlightos/LICENSE"
+install -D -m 0644 "$ROOT/THIRD_PARTY_NOTICES.md" \
+  "$CHROOT/usr/share/doc/moonlightos/THIRD_PARTY_NOTICES.md"
+install -D -m 0644 "$ROOT/SOURCE_CODE.md" \
+  "$CHROOT/usr/share/doc/moonlightos/SOURCE_CODE.md"
+install -D -m 0644 "$ROOT/build/downloads/moonlight-GPL-3.0.txt" \
+  "$CHROOT/usr/share/doc/moonlightos/licenses/moonlight-GPL-3.0.txt"
+install -D -m 0644 "$ROOT/build/downloads/chiaki-ng-AGPL-3.0-OpenSSL.txt" \
+  "$CHROOT/usr/share/doc/moonlightos/licenses/chiaki-ng-AGPL-3.0-OpenSSL.txt"
+install -D -m 0644 "$ROOT/build/downloads/moonlight-6.1.0-source.tar.gz" \
+  "$CHROOT/usr/share/doc/moonlightos/source/moonlight-6.1.0-source.tar.gz"
+install -D -m 0644 "$ROOT/build/downloads/chiaki-ng-1.10.0-source.tar.gz" \
+  "$CHROOT/usr/share/doc/moonlightos/source/chiaki-ng-1.10.0-source.tar.gz"
 for manifest in "$ROOT"/config/apps.d/*.ini; do
   install -D -m 0644 "$manifest" "$CHROOT/usr/share/moonlightos/apps.d/$(basename "$manifest")"
 done
