@@ -21,7 +21,7 @@ trap cleanup EXIT
 xorriso -osirrox on -indev "$ISO" \
   -extract /install/vmlinuz "$work/vmlinuz" \
   -extract /install/initrd.gz "$work/initrd.gz" >/dev/null 2>&1
-cp "$work/initrd.gz" "$work/initrd-preseed.gz"
+install -m 0600 "$work/initrd.gz" "$work/initrd-preseed.gz"
 cp "$ROOT/tests/installer-preseed.cfg" "$work/preseed.cfg"
 (
   cd "$work"
