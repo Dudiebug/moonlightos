@@ -1,4 +1,4 @@
-# MoonlightOS v0.1.7
+# MoonlightOS v0.1.8
 
 MoonlightOS is a Debian 13 (Trixie) x86_64 gaming-streaming appliance. It boots
 directly into a small controller-friendly launcher for Moonlight, chiaki-ng,
@@ -9,10 +9,10 @@ general-purpose desktop.
 > physical Dell OptiPlex DCC36X3 validation matrix must be completed before
 > calling this a production image. See [TESTING.md](docs/TESTING.md).
 
-## What v0.1.7 contains
+## What v0.1.8 contains
 
 - Debian standard kernel, systemd, NetworkManager, nftables, PipeWire, ALSA
-- IPv4-only networking; IPv6 is disabled in v0.1.7
+- IPv4-only networking; IPv6 is disabled in v0.1.8
 - Intel i915, Mesa Vulkan, VA-API, and Intel media-driver packages
 - Cage as the direct DRM/KMS Wayland kiosk compositor; no desktop environment
 - Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned to fixed release URLs
@@ -50,7 +50,7 @@ sudo make build
 Output:
 
 ```text
-build/out/moonlightos-0.1.7-amd64.iso
+build/out/moonlightos-0.1.8-amd64.iso
 ```
 
 `scripts/fetch-apps.sh` downloads only the fixed versions and HTTPS URLs in
@@ -69,15 +69,19 @@ image build. No application binary is committed to Git.
    Tailscale setup, when wanted, uses an
    on-screen QR code.
 
-That is the complete live-image setup. For durable settings, select `Install`
-from the boot menu and follow [INSTALL.md](docs/INSTALL.md). Installation keeps
+That is the complete live-image setup. The same hybrid ISO offers persistent
+live boot, an explicit `No Persistence` recovery entry, and `Install
+MoonlightOS` for installation to another disk. For durable settings, select
+the installer entry and follow [INSTALL.md](docs/INSTALL.md). Installation keeps
 the disk-selection confirmation because silently erasing a disk is unsafe.
 
 The installed system preserves application configuration normally. A live USB
-needs a separate persistence partition; installation is the supported durable
-mode for v0.1.7. A live USB must also persist `/var/lib/bluetooth` for Bluetooth
-pairings to survive reboot. Local LAN streaming and the launcher do not depend
-on Tailscale or Bluetooth.
+needs a separate persistence partition containing `persistence.conf` with
+distinct backing directories. A live USB must also persist
+`/var/lib/bluetooth` for Bluetooth pairings to survive reboot. UEFI installation
+and independent virtual-disk boot are automated; Rufus, Ventoy, physical NVMe,
+and second-USB installation remain physical validation items. Local LAN
+streaming and the launcher do not depend on Tailscale or Bluetooth.
 
 ## Target hardware
 

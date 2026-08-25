@@ -1,6 +1,9 @@
 # Known limitations
 
 - No physical DCC36X3 test has been recorded in this repository yet.
+- UEFI installation and independent virtual-disk boot are automated. Physical
+  NVMe/SATA installation, second-USB installation, Rufus, Ventoy, and live
+  persistence across reboot remain unverified.
 - Moonlight uses XWayland under Cage because the pinned Moonlight Qt build does
   not include a Wayland Qt platform plugin. Cage itself owns DRM/KMS directly.
 - Moonlight and chiaki-ng come from hash-pinned upstream AppImages, but their

@@ -39,6 +39,11 @@ jobs:
         env:
           MOONLIGHTOS_QEMU_LOG: /tmp/moonlightos-qemu-smoke.log
           MOONLIGHTOS_QEMU_SCREENSHOT: /tmp/moonlightos-qemu-smoke.ppm
+      - name: QEMU install smoke test
+        run: make qemu-install-smoke
+        env:
+          MOONLIGHTOS_QEMU_INSTALL_LOG: /tmp/moonlightos-qemu-install.log
+          MOONLIGHTOS_QEMU_INSTALLED_BOOT_LOG: /tmp/moonlightos-qemu-installed-boot.log
       - name: Upload failed boot diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -47,11 +52,13 @@ jobs:
           path: |
             /tmp/moonlightos-qemu-smoke.log
             /tmp/moonlightos-qemu-smoke.ppm
+            /tmp/moonlightos-qemu-install.log
+            /tmp/moonlightos-qemu-installed-boot.log
           if-no-files-found: warn
           retention-days: 2
       - name: Upload ISO
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.7-amd64
-          path: build/out/moonlightos-0.1.7-amd64.iso
+          name: moonlightos-0.1.8-amd64
+          path: build/out/moonlightos-0.1.8-amd64.iso
           if-no-files-found: error

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-0.1.7-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.8-amd64.iso}
 SCREENSHOT=${MOONLIGHTOS_QEMU_SCREENSHOT:-/tmp/moonlightos-qemu-smoke.ppm}
 command -v qemu-system-x86_64 >/dev/null || { echo 'qemu-system-x86_64 is required' >&2; exit 127; }
 [[ -f "$ISO" ]] || { echo "ISO not found: $ISO" >&2; exit 66; }
@@ -32,7 +32,14 @@ if command -v xorriso >/dev/null; then
   grep -q '^serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial setup' >&2; exit 65; }
   grep -q '^terminal_input console serial$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial input' >&2; exit 65; }
   grep -q '^terminal_output console serial$' "$grub_cfg" || { echo 'ISO GRUB config lacks serial output' >&2; exit 65; }
+  grep -q '^menuentry "Start MoonlightOS"' "$grub_cfg" || { echo 'ISO GRUB config lacks the MoonlightOS live entry' >&2; exit 65; }
+  grep -q '^menuentry "Start MoonlightOS (No Persistence)"' "$grub_cfg" || { echo 'ISO GRUB config lacks the recovery live entry' >&2; exit 65; }
   grep -q 'boot=live.*components.*persistence.*ipv6.disable=1.*console=tty1.*console=ttyS0,115200n8' "$grub_cfg" || { echo 'ISO GRUB config lacks expected live boot arguments' >&2; exit 65; }
+  grep -q 'boot=live.*components.*nopersistence.*ipv6.disable=1' "$grub_cfg" || { echo 'ISO GRUB recovery entry does not disable persistence' >&2; exit 65; }
+  installer_cfg=$(mktemp)
+  temporary_files+=("$installer_cfg")
+  xorriso -osirrox on -indev "$ISO" -extract /boot/grub/install_start.cfg "$installer_cfg" >/dev/null 2>&1
+  grep -q "menuentry 'Install MoonlightOS'" "$installer_cfg" || { echo 'ISO GRUB config lacks the MoonlightOS installer entry' >&2; exit 65; }
 fi
 
 capture_screen() {
