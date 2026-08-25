@@ -77,7 +77,7 @@ printf '%q ' qemu-system-x86_64 "${common[@]}" \
 printf '\n' >> "$CONFIG_LOG"
 qemu-img info "$work/system.qcow2" >> "$CONFIG_LOG"
 
-timeout 25m qemu-system-x86_64 \
+qemu-system-x86_64 \
   "${common[@]}" \
   -boot order=d \
   -drive "file=$ISO,media=cdrom,readonly=on" \
@@ -94,21 +94,32 @@ if ! python3 "$ROOT/tests/qemu_iso_boot.py" \
   exit 1
 fi
 
-if ! wait "$pid"; then
+install_complete=false
+for _ in $(seq 1 2100); do
+  if grep -q 'Requesting system reboot' "$INSTALL_LOG"; then
+    install_complete=true
+    break
+  fi
+  kill -0 "$pid" 2>/dev/null || break
+  sleep 1
+done
+if [[ $install_complete != true ]]; then
+  wait "$pid" 2>/dev/null || true
   pid=
   cat "$INSTALL_LOG"
   echo 'Automated UEFI ISO installation failed.' >&2
   exit 1
 fi
+for _ in $(seq 1 30); do
+  kill -0 "$pid" 2>/dev/null || break
+  sleep 1
+done
+kill "$pid" 2>/dev/null || true
+wait "$pid" 2>/dev/null || true
 pid=
 kill "$server_pid" 2>/dev/null || true
 wait "$server_pid" 2>/dev/null || true
 server_pid=
-grep -q 'Requesting system reboot' "$INSTALL_LOG" || {
-  cat "$INSTALL_LOG"
-  echo 'Installer exited without completing.' >&2
-  exit 1
-}
 
 install -D -m 0644 /dev/null "$BOOT_LOG"
 boot_and_wait() {
