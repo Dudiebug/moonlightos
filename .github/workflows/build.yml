@@ -26,6 +26,11 @@ jobs:
             https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
           sudo apt-get install --yes /tmp/live-build.deb
           lb --version
+      - name: Enable QEMU acceleration
+        run: |
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 0666 /dev/kvm
+          fi
       - name: Source tests
         run: make test
       - name: Build ISO

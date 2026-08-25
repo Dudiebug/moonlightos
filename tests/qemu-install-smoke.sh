@@ -53,10 +53,10 @@ common=(
   -drive "file=$work/system.qcow2,if=virtio,format=qcow2"
   -device virtio-vga -display none -monitor none -no-reboot
 )
-[[ -r /dev/kvm ]] && common=(-enable-kvm -cpu host "${common[@]}")
+[[ -r /dev/kvm && -w /dev/kvm ]] && common=(-enable-kvm -cpu host "${common[@]}")
 
 install -D -m 0644 /dev/null "$INSTALL_LOG"
-if ! timeout 15m qemu-system-x86_64 \
+if ! timeout 25m qemu-system-x86_64 \
   "${common[@]}" \
   -kernel "$work/vmlinuz" -initrd "$work/initrd-preseed.gz" \
   -append 'auto=true priority=critical console=ttyS0,115200n8 DEBIAN_FRONTEND=text ---' \

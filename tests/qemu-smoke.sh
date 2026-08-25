@@ -66,7 +66,7 @@ args=(
   -netdev "user,id=net0" -device "e1000,netdev=net0"
   -fw_cfg "name=opt/moonlightos.smoke,string=apps"
 )
-[[ -r /dev/kvm ]] && args=(-enable-kvm -cpu host "${args[@]}")
+[[ -r /dev/kvm && -w /dev/kvm ]] && args=(-enable-kvm -cpu host "${args[@]}")
 
 # OVMF requires a private writable variable store in addition to its read-only
 # code image. A code-only pflash drive can stall before GRUB with no serial log.
