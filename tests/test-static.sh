@@ -180,6 +180,7 @@ rg -q 'MOONLIGHTOS_SMOKE_INSTALLED_DISK_READY' scripts/moonlightos-qemu-smoke te
 rg -q 'MOONLIGHTOS_QEMU_INSTALLER_SCREENSHOT' tests/qemu-install-smoke.sh .github/workflows/build.yml
 rg -q 'MOONLIGHTOS_QEMU_INSTALLED_SCREENSHOT' tests/qemu-install-smoke.sh .github/workflows/build.yml
 rg -q 'Screenshot evidence missing' tests/qemu-install-smoke.sh
+! rg -q 'install -d.*dirname.*screenshot' tests/qemu-install-smoke.sh
 rg -q 'findmnt -n -o FSTYPE /' scripts/moonlightos-qemu-smoke
 rg -q 'lsblk --fs' scripts/moonlightos-qemu-smoke
 rg -q '^[[:space:]]*blkid$' scripts/moonlightos-qemu-smoke

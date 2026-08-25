@@ -25,7 +25,7 @@ cleanup() {
 trap cleanup EXIT
 
 for screenshot in "$MENU_SCREENSHOT" "$EDITOR_SCREENSHOT" "$INSTALLER_SCREENSHOT" "$INSTALLED_SCREENSHOT"; do
-  install -d -m 0755 "$(dirname "$screenshot")"
+  mkdir -p -- "$(dirname "$screenshot")"
   rm -f -- "$screenshot"
 done
 
