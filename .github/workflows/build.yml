@@ -20,12 +20,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes curl ca-certificates cpio debootstrap \
-            debian-archive-keyring xorriso squashfs-tools grub-pc-bin \
+            debian-archive-keyring e2fsprogs xorriso squashfs-tools grub-pc-bin \
             grub-efi-amd64-bin mtools dosfstools qemu-system-x86 ovmf ripgrep
           curl --fail --location --output /tmp/live-build.deb \
             https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
           sudo apt-get install --yes /tmp/live-build.deb
           lb --version
+      - name: Enable QEMU acceleration
+        run: |
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 0666 /dev/kvm
+          fi
       - name: Source tests
         run: make test
       - name: Build ISO
@@ -39,6 +44,15 @@ jobs:
         env:
           MOONLIGHTOS_QEMU_LOG: /tmp/moonlightos-qemu-smoke.log
           MOONLIGHTOS_QEMU_SCREENSHOT: /tmp/moonlightos-qemu-smoke.ppm
+      - name: QEMU install smoke test
+        run: make qemu-install-smoke
+        env:
+          MOONLIGHTOS_QEMU_INSTALL_LOG: /tmp/moonlightos-qemu-install.log
+          MOONLIGHTOS_QEMU_INSTALLED_BOOT_LOG: /tmp/moonlightos-qemu-installed-boot.log
+      - name: QEMU persistence smoke test
+        run: make qemu-persistence-smoke
+        env:
+          MOONLIGHTOS_QEMU_PERSISTENCE_LOG: /tmp/moonlightos-qemu-persistence.log
       - name: Upload failed boot diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -47,11 +61,14 @@ jobs:
           path: |
             /tmp/moonlightos-qemu-smoke.log
             /tmp/moonlightos-qemu-smoke.ppm
+            /tmp/moonlightos-qemu-install.log
+            /tmp/moonlightos-qemu-installed-boot.log
+            /tmp/moonlightos-qemu-persistence.log
           if-no-files-found: warn
           retention-days: 2
       - name: Upload ISO
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.7-amd64
-          path: build/out/moonlightos-0.1.7-amd64.iso
+          name: moonlightos-0.1.8-amd64
+          path: build/out/moonlightos-0.1.8-amd64.iso
           if-no-files-found: error

@@ -7,7 +7,7 @@ out, or unavailable.
 
 ## Package provenance
 
-v0.1.7 installs `tailscale` version `1.102.3` from Tailscale's official stable
+v0.1.8 installs `tailscale` version `1.102.3` from Tailscale's official stable
 Debian Trixie repository:
 
 ```text

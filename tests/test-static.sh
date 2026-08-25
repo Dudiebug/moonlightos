@@ -15,25 +15,39 @@ done < <(rg -l '^#!/bin/bash' build host scripts tests usbip config/live-build/h
 
 boot_test=$(mktemp -d)
 mkdir -p "$boot_test/binary/boot/grub" "$boot_test/binary/isolinux"
-printf 'menuentry live {}\n' > "$boot_test/binary/boot/grub/grub.cfg"
+printf 'menuentry "Live system (amd64)" --hotkey=l {\n linux /live/vmlinuz boot=live components persistence ipv6.disable=1\n initrd /live/initrd.img\n}\n' > "$boot_test/binary/boot/grub/grub.cfg"
+printf "menuentry 'Start installer' {}\n" > "$boot_test/binary/boot/grub/install_start.cfg"
 printf 'include menu.cfg\nprompt 0\ntimeout 0\n' > "$boot_test/binary/isolinux/isolinux.cfg"
+printf 'label live-amd64\n menu label ^Live system (amd64)\n menu default\n linux /live/vmlinuz\n initrd /live/initrd.img\n append boot=live components persistence ipv6.disable=1\n' > "$boot_test/binary/isolinux/live.cfg"
+printf 'label installstart\n menu label Start ^installer\n' > "$boot_test/binary/isolinux/install.cfg"
+(cd "$boot_test" && bash "$ROOT/config/live-build/hooks/live/0100-autoboot.hook.binary")
 (cd "$boot_test" && bash "$ROOT/config/live-build/hooks/live/0100-autoboot.hook.binary")
 rg -q '^set default=0$' "$boot_test/binary/boot/grub/grub.cfg"
 rg -q '^set timeout=3$' "$boot_test/binary/boot/grub/grub.cfg"
 rg -q '^terminal_output console serial$' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^menuentry "Start MoonlightOS"' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q '^menuentry "Start MoonlightOS \(No Persistence\)"' "$boot_test/binary/boot/grub/grub.cfg"
+[[ $(rg -c '^menuentry "Start MoonlightOS \(No Persistence\)"' "$boot_test/binary/boot/grub/grub.cfg") == 1 ]]
+rg -q 'boot=live components nopersistence ipv6.disable=1' "$boot_test/binary/boot/grub/grub.cfg"
+rg -q "menuentry 'Install MoonlightOS'" "$boot_test/binary/boot/grub/install_start.cfg"
 rg -q '^timeout 30$' "$boot_test/binary/isolinux/isolinux.cfg"
 ! rg -q '^timeout 0$' "$boot_test/binary/isolinux/isolinux.cfg"
+rg -q 'menu label \^Start MoonlightOS$' "$boot_test/binary/isolinux/live.cfg"
+rg -q 'menu label Start MoonlightOS \(No Persistence\)$' "$boot_test/binary/isolinux/live.cfg"
+[[ $(rg -c 'menu label Start MoonlightOS \(No Persistence\)$' "$boot_test/binary/isolinux/live.cfg") == 1 ]]
+rg -q 'boot=live components nopersistence ipv6.disable=1' "$boot_test/binary/isolinux/live.cfg"
+rg -q 'menu label \^Install MoonlightOS$' "$boot_test/binary/isolinux/install.cfg"
 find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.7 ]]
+[[ "$(< VERSION)" == 0.1.8 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.7-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
-rg -q '^  actions: read$' .github/workflows/release-v0.1.7.yml
-rg -q 'git/matching-refs/tags/0\.1\.7' .github/workflows/release-v0.1.7.yml
-rg -q 'docs/releases/v0\.1\.7\.md' .github/workflows/release-v0.1.7.yml
-! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.7.yml
+rg -q 'moonlightos-0\.1\.8-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q '^  actions: read$' .github/workflows/release-v0.1.8.yml
+rg -q 'git/matching-refs/tags/0\.1\.8' .github/workflows/release-v0.1.8.yml
+rg -q 'docs/releases/v0\.1\.8\.md' .github/workflows/release-v0.1.8.yml
+! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.8.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
@@ -83,6 +97,9 @@ rg -q 'chiaki-ng-ready' scripts/moonlightos-qemu-smoke
 rg -q 'firefox-ready' scripts/moonlightos-qemu-smoke
 rg -q 'systemctl start --no-block moonlightos-firefox.service' scripts/moonlightos-qemu-smoke
 rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
+rg -q 'qemu-persistence-smoke' Makefile .github/workflows/build.yml
+rg -q 'live-persistence-write' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh
+rg -q 'live-persistence-absent' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh
 rg -q 'ConditionPathExists=/sys/firmware/qemu_fw_cfg' services/moonlightos-qemu-smoke.service
 rg -q 'MOONLIGHTOS_SMOKE_APPS_READY' scripts/moonlightos-qemu-smoke tests/qemu-smoke.sh
 rg -q 'moonlightos-firefox.path' config/live-build/hooks/live/0100-moonlightos.hook.chroot

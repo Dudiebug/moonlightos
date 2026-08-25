@@ -15,7 +15,7 @@ mapping, support redaction, removable-media policy, safe archive streaming,
 atomic copy, checked unmount ordering, failed-copy cleanup, Bluetooth protocol
 validation, BlueZ object parsing, pairing-agent callbacks, and Bluetooth UI
 recovery. They do not require a tailnet or Bluetooth adapter.
-The v0.1.7 cases also cover manifest isolation and atomic state, configured-app
+The v0.1.8 cases also cover manifest isolation and atomic state, configured-app
 argv/environment construction, separate Foot wrapping, setup completion,
 buffered-keyboard navigation and payload validation, and the Guide+X chord.
 
@@ -26,7 +26,7 @@ sudo apt install qemu-system-x86 ovmf
 make qemu-smoke
 ```
 
-The script boots `build/out/moonlightos-0.1.7-amd64.iso` with serial
+The script boots `build/out/moonlightos-0.1.8-amd64.iso` with serial
 output, a virtual Ethernet NIC, and UEFI when OVMF is available. Success means
 the boot reached the MoonlightOS launcher service marker. QEMU does not prove
 Intel VA-API, physical Bluetooth behavior, display audio, gamepad, USB/IP
@@ -56,16 +56,28 @@ Launcher output is
 mirrored to the boot console and remains available in
 `/var/log/moonlightos/launcher.log`.
 
-## Installed-system QEMU procedure
+## Installed-system QEMU smoke test
 
-Create a disposable 24 GB disk, boot the ISO with a graphical QEMU display,
-and complete Debian Installer manually:
+```bash
+make qemu-install-smoke
+```
+
+This test extracts the Debian Installer kernel and initrd from the built ISO,
+adds a test-only preseed, installs to a disposable 24 GB UEFI virtual disk,
+boots that disk without the ISO, writes a configuration marker, cold-boots the
+disk again, and requires the marker and `MOONLIGHTOS_LAUNCHER_READY`.
+The install and installed-boot logs default to
+`/tmp/moonlightos-qemu-install.log` and
+`/tmp/moonlightos-qemu-installed-boot.log`.
+
+For an interactive install, create a disposable disk, boot the ISO with a
+graphical QEMU display, and complete Debian Installer manually:
 
 ```bash
 qemu-img create -f qcow2 build/out/moonlightos-install-test.qcow2 24G
 qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -cdrom build/out/moonlightos-0.1.7-amd64.iso \
+  -cdrom build/out/moonlightos-0.1.8-amd64.iso \
   -drive file=build/out/moonlightos-install-test.qcow2,if=virtio \
   -device virtio-vga -display gtk \
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0
@@ -73,6 +85,40 @@ qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
 
 After reboot, verify launcher/app exit/crash recovery and confirm the saved
 `/var/lib/moonlightos/config.ini` values remain unchanged.
+
+The automated install test proves UEFI installation, an independent installed
+boot, and configuration persistence across a cold reboot. It does not prove
+physical NVMe, USB destination selection, Rufus, or Ventoy behavior.
+
+## Live-persistence QEMU smoke test
+
+```bash
+make qemu-persistence-smoke
+```
+
+This test creates an ext4 backend with the documented `persistence.conf`, boots
+the release ISO twice, and verifies MoonlightOS, Moonlight, chiaki-ng,
+Tailscale, BlueZ, and log state across reboot. A third boot passes
+`nopersistence` while the same backend remains attached and verifies that none
+of its test state is visible.
+
+## Deployment-mode checklist
+
+- [x] One `iso-hybrid` artifact contains live and Debian Installer paths
+- [x] UEFI QEMU live boot reaches the launcher
+- [x] UEFI QEMU installs to a virtual disk
+- [x] Installed virtual disk boots without the ISO and reaches the launcher
+- [x] Installed virtual-disk configuration survives a cold reboot
+- [x] Live boot without a persistence device
+- [x] Live persistence survives reboot for Moonlight, chiaki-ng, Tailscale,
+      and BlueZ state
+- [x] `No Persistence` ignores an existing persistence backend
+- [ ] Invalid and full persistence backends fail diagnostically
+- [ ] Rufus DD/Image-mode USB boot on physical UEFI hardware
+- [ ] Ventoy normal-mode live boot and installer entry
+- [ ] Ventoy persistence backend across reboot
+- [ ] Install to physical internal NVMe/SATA
+- [ ] Install from USB #1 to USB #2 and boot USB #2 independently
 
 ## Physical DCC36X3 checklist (must be recorded, never inferred)
 
