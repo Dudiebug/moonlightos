@@ -64,7 +64,8 @@ make qemu-install-smoke
 
 This test extracts the Debian Installer kernel and initrd from the built ISO,
 adds a test-only preseed, installs to a disposable 24 GB UEFI virtual disk,
-boots that disk without the ISO, and requires `MOONLIGHTOS_LAUNCHER_READY`.
+boots that disk without the ISO, writes a configuration marker, cold-boots the
+disk again, and requires the marker and `MOONLIGHTOS_LAUNCHER_READY`.
 The install and installed-boot logs default to
 `/tmp/moonlightos-qemu-install.log` and
 `/tmp/moonlightos-qemu-installed-boot.log`.
@@ -85,7 +86,8 @@ qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
 After reboot, verify launcher/app exit/crash recovery and confirm the saved
 `/var/lib/moonlightos/config.ini` values remain unchanged.
 
-The automated test proves UEFI installation and an independent installed boot.
+The automated test proves UEFI installation, an independent installed boot,
+and configuration persistence across a cold reboot.
 It does not prove physical NVMe, USB destination selection, Rufus, Ventoy, or
 live-persistence behavior.
 
@@ -95,8 +97,8 @@ live-persistence behavior.
 - [x] UEFI QEMU live boot reaches the launcher
 - [x] UEFI QEMU installs to a virtual disk
 - [x] Installed virtual disk boots without the ISO and reaches the launcher
-- [ ] Installed virtual-disk configuration survives a cold reboot
-- [ ] Live boot without a persistence device
+- [x] Installed virtual-disk configuration survives a cold reboot
+- [x] Live boot without a persistence device
 - [ ] Live persistence survives reboot for Moonlight, chiaki-ng, Tailscale,
       and BlueZ state
 - [ ] `No Persistence` ignores an existing persistence backend

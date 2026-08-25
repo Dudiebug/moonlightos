@@ -143,4 +143,4 @@ capture_screen
 
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
-echo 'QEMU smoke test passed: launcher/setup readiness, configured apps, OSK, Bluetooth, USB/IP, Moonlight, Chiaki-ng, and Firefox started.'
+echo 'QEMU smoke test passed: no-backend live boot, launcher/setup readiness, configured apps, OSK, Bluetooth, USB/IP, Moonlight, Chiaki-ng, and Firefox started.'

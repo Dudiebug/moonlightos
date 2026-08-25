@@ -73,19 +73,30 @@ grep -q 'Requesting system reboot' "$INSTALL_LOG" || {
 }
 
 install -D -m 0644 /dev/null "$BOOT_LOG"
-qemu-system-x86_64 \
-  "${common[@]}" \
-  -netdev user,id=net0 -device e1000,netdev=net0 \
-  -serial stdio > "$BOOT_LOG" 2>&1 &
-pid=$!
-for _ in $(seq 1 240); do
-  if grep -q 'MOONLIGHTOS_LAUNCHER_READY' "$BOOT_LOG"; then
-    echo 'QEMU install smoke test passed: UEFI install, independent disk boot, and launcher readiness.'
-    exit 0
-  fi
-  kill -0 "$pid" 2>/dev/null || break
-  sleep 1
-done
-cat "$BOOT_LOG"
-echo 'Installed system did not reach the launcher.' >&2
-exit 1
+boot_and_wait() {
+  local mode=$1 marker=$2
+  printf '\n=== installed boot: %s ===\n' "$mode" >> "$BOOT_LOG"
+  qemu-system-x86_64 \
+    "${common[@]}" \
+    -netdev user,id=net0 -device e1000,netdev=net0 \
+    -fw_cfg "name=opt/moonlightos.smoke,string=$mode" \
+    -serial stdio >> "$BOOT_LOG" 2>&1 &
+  pid=$!
+  for _ in $(seq 1 240); do
+    if grep -q "$marker" "$BOOT_LOG"; then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      pid=
+      return 0
+    fi
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 1
+  done
+  cat "$BOOT_LOG"
+  echo "Installed system did not emit $marker." >&2
+  exit 1
+}
+
+boot_and_wait persistence-write MOONLIGHTOS_SMOKE_PERSISTENCE_WRITTEN
+boot_and_wait persistence-read MOONLIGHTOS_SMOKE_PERSISTENCE_READY
+echo 'QEMU install smoke test passed: UEFI install, independent disk boot, launcher readiness, and configuration persistence across a cold reboot.'

@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 flag=/sys/firmware/qemu_fw_cfg/by_name/opt/moonlightos.smoke/raw
 [[ -r "$flag" ]] || exit 0
-[[ $(tr -d '\0' < "$flag") == apps ]] || exit 0
+mode=$(tr -d '\0' < "$flag")
 
 wait_for_file() {
   local path=$1 label=$2
@@ -16,6 +16,22 @@ wait_for_file() {
 }
 
 wait_for_file /run/moonlightos/launcher-ready launcher
+case $mode in
+  persistence-write)
+    printf '\n[qemu-smoke]\ncold_boot = verified\n' >> /var/lib/moonlightos/config.ini
+    sync
+    echo MOONLIGHTOS_SMOKE_PERSISTENCE_WRITTEN
+    exit 0
+    ;;
+  persistence-read)
+    grep -Fxq 'cold_boot = verified' /var/lib/moonlightos/config.ini
+    echo MOONLIGHTOS_SMOKE_PERSISTENCE_READY
+    exit 0
+    ;;
+  apps) ;;
+  *) exit 0 ;;
+esac
+
 test -x /usr/libexec/moonlightos-run-configured-app
 test -x /usr/libexec/moonlightos-osk
 test -x /usr/libexec/moonlightos-osk-session
