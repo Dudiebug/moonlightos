@@ -59,7 +59,11 @@ install -d -o root -g root -m 0700 /var/lib/tailscale
 cat > /etc/apt/sources.list.d/tailscale.list <<'EOF'
 deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian trixie main
 EOF
-chmod 0644 /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg
+cat > /etc/apt/sources.list.d/google-chrome.list <<'EOF'
+deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main
+EOF
+chmod 0644 /etc/apt/sources.list.d/{tailscale,google-chrome}.list \
+  /usr/share/keyrings/{tailscale-archive-keyring.gpg,google-chrome.asc}
 
 systemctl enable NetworkManager.service NetworkManager-wait-online.service
 systemctl enable systemd-timesyncd.service

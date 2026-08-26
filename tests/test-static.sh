@@ -99,6 +99,13 @@ rg -q 'unsquashfs -quiet -offset' build/configure.sh
 removed_units='moonlightos-escape''-guard|moonlightos-stop''-active-app'
 ! rg -q "$removed_units" build/configure.sh
 rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^google-chrome-stable$' config/live-build/package-lists/moonlightos.list.chroot
+! rg -q '^chromium' config/live-build/package-lists/moonlightos.list.chroot
+rg -q 'https://dl.google.com/linux/chrome/deb/ stable main' config/live-build/archives/google-chrome.list.chroot
+rg -q 'linux_signing_key.pub' build/sources.lock
+rg -q '^command = /usr/bin/google-chrome-stable$' config/apps.d/35-google-chrome.ini
+rg -q 'command="/usr/bin/google-chrome-stable"' launcher/moonlightos-launcher.py
+rg -q -- '--ozone-platform=wayland' config/apps.d/35-google-chrome.ini launcher/moonlightos-launcher.py
 rg -q '^libavcodec61$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^systemd-timesyncd$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wlrctl$' config/live-build/package-lists/moonlightos.list.chroot
@@ -125,6 +132,7 @@ rg -q 'moonlight-ready' scripts/moonlightos-qemu-smoke
 rg -q 'chiaki-ng-ready' scripts/moonlightos-qemu-smoke
 rg -q 'firefox-ready' scripts/moonlightos-qemu-smoke
 rg -q 'systemctl start --no-block moonlightos-firefox.service' scripts/moonlightos-qemu-smoke
+rg -q 'google-chrome-ready' scripts/moonlightos-qemu-smoke
 rg -q 'name=opt/moonlightos.smoke,string=apps' tests/qemu-smoke.sh
 rg -q 'qemu-persistence-smoke' Makefile .github/workflows/build.yml
 rg -q 'live-persistence-write' scripts/moonlightos-qemu-smoke tests/qemu-persistence-smoke.sh

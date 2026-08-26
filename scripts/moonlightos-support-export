@@ -326,6 +326,7 @@ def collect(bundle: pathlib.Path) -> None:
             "-f=${binary:Package}\t${Version}\n",
             "cage",
             "firefox-esr",
+            "google-chrome-stable",
             "libavcodec61",
             "linux-image-amd64",
             "mesa-vulkan-drivers",
@@ -356,6 +357,7 @@ def collect(bundle: pathlib.Path) -> None:
         ["/usr/bin/python3", "/usr/libexec/moonlightos_apps.py"],
     )
     add_command(bundle, "firefox/package-source.txt", ["apt-cache", "policy", "firefox-esr"])
+    add_command(bundle, "chrome/package-source.txt", ["apt-cache", "policy", "google-chrome-stable"])
     add_file(bundle, "firefox/eme-widevine-status.txt", RUN / "firefox-drm-status")
     add_file(bundle, "firefox/eme-policy.json", pathlib.Path("/etc/firefox/policies/policies.json"))
     managed = []

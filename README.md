@@ -2,7 +2,7 @@
 
 MoonlightOS is a Debian 13 (Trixie) x86_64 gaming-streaming appliance. It boots
 directly into a small controller-friendly launcher for Moonlight, chiaki-ng,
-and Firefox ESR, with an allowlist-only Linux USB/IP server. It is not a
+Firefox ESR, and official Google Chrome, with an allowlist-only Linux USB/IP server. It is not a
 general-purpose desktop.
 
 > Testing status: source/static and QEMU application tests are automated. The
@@ -20,6 +20,7 @@ general-purpose desktop.
 - Cage as the direct DRM/KMS Wayland kiosk compositor; no desktop environment
 - Moonlight Qt 6.1.0 and chiaki-ng 1.10.0 pinned to fixed release URLs
 - Firefox ESR from Debian 13, running natively on Wayland with a persistent profile
+- Official Google Chrome Stable from Google's signed Debian repository, with a persistent profile
 - black-and-white full-screen terminal launcher with keyboard and common gamepad navigation
 - matching high-contrast UEFI/BIOS boot menus and dark text installer
 - controller-friendly Bluetooth management inside Settings, backed by BlueZ
@@ -60,8 +61,9 @@ build/out/moonlightos-0.1.10-amd64.iso
 `scripts/fetch-apps.sh` downloads only the fixed versions and HTTPS URLs in
 `build/applications.lock`. `build/configure.sh`
 extracts their pinned payloads into the read-only image so runtime FUSE is not
-required. Firefox is installed from Debian's signed repositories during the
-image build. No application binary is committed to Git.
+required. Firefox is installed from Debian's signed repositories and Google
+Chrome Stable from Google's signed repository during the image build. No
+application binary is committed to Git.
 
 ## First boot
 
@@ -108,6 +110,7 @@ display path are tested.
 | Moonlight host list/pairing | `/var/lib/moonlightos/home/.config/` |
 | chiaki-ng registration | `/var/lib/moonlightos/home/.config/` |
 | Firefox profile, bookmarks, and settings | `/var/lib/moonlightos/home/.mozilla/` |
+| Google Chrome profile, bookmarks, and settings | `/var/lib/moonlightos/home/.config/google-chrome/` |
 | Launcher controller identity | `/var/lib/moonlightos/launcher-controller.id` |
 | Bluetooth power preference | `/var/lib/moonlightos/bluetooth-enabled` |
 | Application manifests and state | `/var/lib/moonlightos/apps.d/`, `/var/lib/moonlightos/apps-state.ini` |

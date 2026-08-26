@@ -150,4 +150,7 @@ wait_for_file /run/moonlightos/chiaki-ng-ready chiaki-ng
 systemctl stop moonlightos-chiaki.service
 systemctl start --no-block moonlightos-firefox.service
 wait_for_file /run/moonlightos/firefox-ready Firefox
+printf 'google-chrome\n' > /run/moonlightos/launch-app.request
+systemctl start --no-block moonlightos-configured-app.service
+wait_for_file /run/moonlightos/google-chrome-ready 'Google Chrome'
 echo MOONLIGHTOS_SMOKE_APPS_READY

@@ -398,6 +398,7 @@ class Launcher:
     def focus_app(app: apps.Application) -> bool:
         matches = {
             "firefox": ("app_id:firefox-esr", "app_id:firefox", "title:Mozilla Firefox"),
+            "google-chrome": ("app_id:google-chrome", "title:Google Chrome"),
             "moonlight": ("app_id:moonlight", "title:Moonlight"),
             "chiaki-ng": ("app_id:chiaki", "app_id:io.github.streetpea.Chiaki4deck", "title:Chiaki"),
         }.get(app.id, (f"title:{app.name}",))
@@ -1054,9 +1055,9 @@ class ApplicationsSettings:
             self._write_user(
                 apps.Application(
                     id=app_id, name=name.strip().upper(), kind="command",
-                    command="/usr/bin/firefox-esr", arguments=shlex.join(["--kiosk", url]),
+                    command="/usr/bin/google-chrome-stable",
+                    arguments=shlex.join(["--ozone-platform=wayland", "--kiosk", "--no-first-run", url]),
                     status_id=app_id, order=order,
-                    environment={"MOZ_ENABLE_WAYLAND": "1"},
                 )
             )
             self.status = f"ADDED {name.strip().upper()}"

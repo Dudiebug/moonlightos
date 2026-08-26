@@ -20,6 +20,10 @@ install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
   "$WORK/config/archives/tailscale.key.chroot"
 install -D -m 0644 "$ROOT/build/downloads/tailscale-archive-keyring.gpg" \
   "$CHROOT/usr/share/keyrings/tailscale-archive-keyring.gpg"
+install -D -m 0644 "$ROOT/build/downloads/google-linux-signing-key.asc" \
+  "$WORK/config/archives/google-chrome.key.chroot"
+install -D -m 0644 "$ROOT/build/downloads/google-linux-signing-key.asc" \
+  "$CHROOT/usr/share/keyrings/google-chrome.asc"
 
 install -D -m 0755 "$ROOT/launcher/moonlightos-launcher.py" "$CHROOT/usr/libexec/moonlightos-launcher"
 install -D -m 0755 "$ROOT/launcher/gamepad-nav.py" "$CHROOT/usr/libexec/moonlightos-gamepad-nav"

@@ -16,6 +16,8 @@
 - The controller keyboard is a full-screen buffered utility, not a compositor overlay.
   Physical controller and text-injection validation remains required.
 - Custom command applications must already exist on the filesystem.
+- Google Chrome is tested for startup in QEMU, but Disney+ does not officially
+  support ordinary Linux distributions; Chrome therefore does not guarantee playback.
 - Bluetooth depends on kernel and firmware support for the installed adapter.
   QEMU verifies only clean no-adapter behavior; no physical Bluetooth result is
   claimed. MoonlightOS provides no desktop Bluetooth application.

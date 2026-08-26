@@ -47,7 +47,8 @@ timeout and serial settings before starting the VM.
 Success requires `MOONLIGHTOS_LAUNCHER_READY`, emitted only after foot presents
 the full-screen curses launcher. A QEMU-only firmware flag then starts the three
 production application services and requires `MOONLIGHTOS_APP_STARTED moonlight`,
-`MOONLIGHTOS_APP_STARTED chiaki-ng`, and `MOONLIGHTOS_APP_STARTED firefox`
+`MOONLIGHTOS_APP_STARTED chiaki-ng`, `MOONLIGHTOS_APP_STARTED firefox`, and a
+five-second `google-chrome-ready` marker from the generic application runner
 after each real application remains alive for five seconds. It also proves the
 Bluetooth control service handles an absent adapter and survives restarts of
 BlueZ and its own service without changing the launcher or audio-session PID
@@ -151,6 +152,8 @@ Applications and acceleration:
 - [ ] Closing Moonlight returns to the launcher
 - [ ] Closing chiaki-ng returns to the launcher
 - [ ] Closing Firefox returns to the launcher
+- [ ] Closing Google Chrome returns to the launcher
+- [ ] Confirm Widevine protected playback in Google Chrome and record Disney+ behavior separately
 - [ ] Exit and Ctrl+D close Terminal and return to the launcher
 - [ ] Ctrl+C in Terminal, nmtui, diagnostics, and Tailscale does not interrupt the launcher
 - [ ] Guide/Home + X/Square opens the buffered keyboard over each supported application
