@@ -43,8 +43,9 @@ jobs:
         run: |
           test -s dist/moonlightos-0.1.10-amd64.iso
           if gh release view 0.1.10 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete 0.1.10 --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
-          elif gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/0.1.10" >/dev/null 2>&1; then
+            gh release delete 0.1.10 --repo "$GITHUB_REPOSITORY" --yes
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/0.1.10" >/dev/null 2>&1; then
             gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/0.1.10"
           fi
           gh release create 0.1.10 \

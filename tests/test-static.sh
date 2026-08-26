@@ -72,7 +72,7 @@ rg -q 'sudo chown -R .*build/out' .github/workflows/build.yml
 rg -q '^  actions: read$' .github/workflows/release-v0.1.10.yml
 rg -q 'git/refs/tags/0\.1\.10' .github/workflows/release-v0.1.10.yml
 rg -q 'docs/releases/v0\.1\.10\.md' .github/workflows/release-v0.1.10.yml
-rg -q 'release delete 0\.1\.10.*--cleanup-tag' .github/workflows/release-v0.1.10.yml
+rg -q 'release delete 0\.1\.10.*--yes' .github/workflows/release-v0.1.10.yml
 ! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.10.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
