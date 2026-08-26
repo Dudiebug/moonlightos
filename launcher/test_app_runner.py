@@ -107,7 +107,7 @@ class RunnerTest(unittest.TestCase):
             request.write_text("demo\n")
             handlers = {}
             process = mock.Mock(pid=123)
-            process.poll.return_value = None
+            process.poll.side_effect = [None, None, 0]
             process.wait.side_effect = lambda: (handlers[runner.signal.SIGTERM](runner.signal.SIGTERM, None), -15)[1]
 
             def install(signum, handler):
@@ -125,6 +125,33 @@ class RunnerTest(unittest.TestCase):
             killpg.assert_called_once_with(123, runner.signal.SIGTERM)
             self.assertFalse((root / "app-active").exists())
             self.assertFalse((root / "demo-ready").exists())
+
+    def test_close_request_gracefully_stops_owned_process_group(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            manifest = root / "demo.ini"
+            manifest.write_text(apps.serialize(self.app()), encoding="utf-8")
+            loaded = apps.read_manifest(manifest)
+            request = root / "request"
+            request.write_text("demo\n")
+            process = mock.Mock(pid=321)
+            process.poll.side_effect = [None, None]
+            process.wait.return_value = -15
+
+            def mark_close(*_args, **_kwargs):
+                (root / "close-demo").touch()
+                return process
+
+            with mock.patch.object(runner, "RUN", root), mock.patch.object(
+                runner, "READY_SECONDS", 0.0
+            ), mock.patch.object(
+                runner.apps, "load_applications", return_value=apps.LoadResult((loaded,), ())
+            ), mock.patch.object(runner.subprocess, "Popen", side_effect=mark_close), mock.patch.object(
+                runner.os, "killpg"
+            ) as killpg:
+                self.assertEqual(runner.run(request), 0)
+            killpg.assert_called_once_with(321, runner.signal.SIGTERM)
+            self.assertEqual((root / "demo-status").read_text(), "exited: status 0\n")
 
 
 if __name__ == "__main__":

@@ -62,6 +62,7 @@ EOF
 chmod 0644 /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg
 
 systemctl enable NetworkManager.service NetworkManager-wait-online.service
+systemctl enable systemd-timesyncd.service
 systemctl enable seatd.service moonlightos-network-ready.service
 systemctl enable moonlightos-firewall.service moonlightos-usbipd.service
 systemctl enable moonlightos-usbip-reconcile.path

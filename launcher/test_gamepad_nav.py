@@ -26,6 +26,8 @@ class Codes:
     KEY_RIGHT = 106
     KEY_ENTER = 28
     KEY_ESC = 1
+    KEY_HOME = 102
+    KEY_DELETE = 111
 
 
 class GamepadMappingTest(unittest.TestCase):
@@ -47,6 +49,10 @@ class GamepadMappingTest(unittest.TestCase):
         self.assertEqual(self.module.key_for_event(south), Codes.KEY_ENTER)
         self.assertEqual(self.module.key_for_event(east), Codes.KEY_ESC)
 
+    def test_west_button_maps_to_close_action(self):
+        west = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.BTN_WEST)
+        self.assertEqual(self.module.key_for_event(west), Codes.KEY_DELETE)
+
     def test_dpad_and_hat_map_to_arrows(self):
         dpad = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.BTN_DPAD_DOWN)
         hat = SimpleNamespace(type=Codes.EV_ABS, value=-1, code=Codes.ABS_HAT0X)
@@ -57,17 +63,13 @@ class GamepadMappingTest(unittest.TestCase):
         release = SimpleNamespace(type=Codes.EV_KEY, value=0, code=Codes.BTN_SOUTH)
         self.assertIsNone(self.module.key_for_event(release))
 
-    def test_keyboard_chord_triggers_once_until_released(self):
-        chord = self.module.KeyboardChord()
+    def test_keyboard_and_controller_home_are_global_events(self):
         mode = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.BTN_MODE)
-        west = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.BTN_WEST)
-        repeat = SimpleNamespace(type=Codes.EV_KEY, value=2, code=Codes.BTN_WEST)
-        release = SimpleNamespace(type=Codes.EV_KEY, value=0, code=Codes.BTN_WEST)
-        self.assertFalse(chord.update(mode))
-        self.assertTrue(chord.update(west))
-        self.assertFalse(chord.update(repeat))
-        self.assertFalse(chord.update(release))
-        self.assertTrue(chord.update(west))
+        home = SimpleNamespace(type=Codes.EV_KEY, value=1, code=Codes.KEY_HOME)
+        release = SimpleNamespace(type=Codes.EV_KEY, value=0, code=Codes.KEY_HOME)
+        self.assertTrue(self.module.is_home_event(mode))
+        self.assertTrue(self.module.is_home_event(home))
+        self.assertFalse(self.module.is_home_event(release))
 
 
 if __name__ == "__main__":

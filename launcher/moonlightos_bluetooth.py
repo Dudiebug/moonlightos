@@ -39,16 +39,26 @@ def address_suffix(address: str) -> str:
     return ":".join(address.split(":")[-2:])
 
 
+def has_useful_name(device: dict[str, Any]) -> bool:
+    alias = safe_text(device.get("alias") or "").strip()
+    if not alias:
+        return False
+    compact = re.sub(r"[^0-9A-Fa-f]", "", alias)
+    return not (len(compact) == 12 and all(character in "0123456789abcdefABCDEF" for character in compact))
+
+
+def named_devices(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [device for device in devices if has_useful_name(device)]
+
+
 def device_labels(devices: list[dict[str, Any]]) -> list[str]:
-    """Return stable, non-empty labels and disambiguate duplicate aliases."""
+    """Return stable labels and disambiguate duplicate useful aliases."""
     aliases = [safe_text(item.get("alias") or "").strip() for item in devices]
     counts = collections.Counter(alias.casefold() for alias in aliases if alias)
     labels: list[str] = []
     for device, alias in zip(devices, aliases):
         suffix = address_suffix(str(device.get("address") or ""))
-        if not alias:
-            labels.append(f"UNKNOWN DEVICE · {suffix}")
-        elif counts[alias.casefold()] > 1:
+        if counts[alias.casefold()] > 1:
             labels.append(f"{alias} · {suffix}")
         else:
             labels.append(alias)
@@ -493,7 +503,7 @@ class BluetoothMenu:
                     ):
                         discovery_requested = self._request("start_scan") is not None
                         last_scan_request = time.monotonic()
-                    devices = list(snapshot.get("devices") or [])
+                    devices = named_devices(list(snapshot.get("devices") or []))
                     devices.sort(
                         key=lambda item: (
                             not bool(item.get("paired")),

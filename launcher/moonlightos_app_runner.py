@@ -76,8 +76,10 @@ def run(request_path: pathlib.Path = REQUEST) -> int:
     status = RUN / f"{app_id}-status"
     ready = RUN / f"{app_id}-ready"
     active = RUN / "app-active"
+    close = RUN / f"close-{app_id}"
     process: subprocess.Popen[bytes] | None = None
     received_signal = 0
+    close_requested = False
 
     def stop(signum: int, _frame: object) -> None:
         nonlocal received_signal
@@ -108,6 +110,8 @@ def run(request_path: pathlib.Path = REQUEST) -> int:
             raise ValueError("application manifest changed during launch")
         status = RUN / f"{app.status_id}-status"
         ready = RUN / f"{app.status_id}-ready"
+        close = RUN / f"close-{app.status_id}"
+        close.unlink(missing_ok=True)
         ready.unlink(missing_ok=True)
         atomic_status(status, "starting")
         if not pathlib.Path(app.command).is_file() or not os.access(app.command, os.X_OK):
@@ -126,7 +130,26 @@ def run(request_path: pathlib.Path = REQUEST) -> int:
         if process.poll() is None:
             ready.touch(mode=0o640)
             atomic_status(status, "started")
+        while process.poll() is None:
+            if close.exists():
+                close_requested = True
+                close.unlink(missing_ok=True)
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                break
+            time.sleep(0.1)
         rc = process.wait()
+        if close_requested:
+            rc = 0
         if received_signal:
             rc = 128 + received_signal
         if ready.exists():
@@ -142,6 +165,7 @@ def run(request_path: pathlib.Path = REQUEST) -> int:
         for signum, handler in previous.items():
             signal.signal(signum, handler)
         ready.unlink(missing_ok=True)
+        close.unlink(missing_ok=True)
         try:
             if active.read_text(encoding="ascii").strip() == app_id:
                 active.unlink()

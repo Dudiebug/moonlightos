@@ -146,6 +146,10 @@ class LauncherTest(unittest.TestCase):
         launcher.setup_wizard.assert_called_once_with()
 
     def test_settings_contains_applications_and_setup(self):
+        self.assertIn("DISPLAY", self.module.SETTINGS_MENU)
+        self.assertIn("AUDIO", self.module.SETTINGS_MENU)
+        self.assertIn("ACTIVE APPLICATIONS", self.module.SETTINGS_MENU)
+        self.assertIn("TAILSCALE", self.module.SETTINGS_MENU)
         self.assertIn("APPLICATIONS", self.module.SETTINGS_MENU)
         self.assertIn("SETUP WIZARD", self.module.SETTINGS_MENU)
         self.assertFalse(hasattr(self.module.Launcher, "terminal_command"))

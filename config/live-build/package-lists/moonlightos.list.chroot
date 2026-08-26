@@ -35,6 +35,8 @@ xwayland
 foot
 wlr-randr
 firefox-esr
+wlrctl
+libavcodec61
 gamescope/trixie-backports
 python3
 python3-evdev
@@ -54,6 +56,7 @@ libspa-0.2-bluetooth
 joystick
 bluez
 steam-devices
+systemd-timesyncd
 
 # USB/IP and diagnostics
 usbip

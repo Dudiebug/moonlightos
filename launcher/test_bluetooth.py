@@ -86,11 +86,19 @@ class BluetoothHelpersTest(unittest.TestCase):
             ["Wireless Controller · EE:FF", "Wireless Controller · EE:11"],
         )
 
-    def test_unnamed_device_never_has_empty_label(self):
+    def test_unnamed_and_mac_only_devices_are_hidden(self):
         self.assertEqual(
-            bluetooth.device_labels([dict(DEVICE, alias="")]),
-            ["UNKNOWN DEVICE · EE:FF"],
+            bluetooth.named_devices([
+                dict(DEVICE, alias=""),
+                dict(DEVICE, alias="AA:BB:CC:DD:EE:FF"),
+                dict(DEVICE, alias="aabbccddeeff"),
+                DEVICE,
+            ]),
+            [DEVICE],
         )
+
+    def test_named_paired_device_remains_visible(self):
+        self.assertTrue(bluetooth.has_useful_name(DEVICE))
 
     def test_socket_client_rejects_malformed_response(self):
         connection = mock.Mock()
@@ -127,6 +135,12 @@ class BluetoothMenuTest(unittest.TestCase):
         client = FakeClient([dict(ADAPTER_ON, devices=[dict(DEVICE, connected=True)])])
         bluetooth.BluetoothMenu(screen, client).run()
         self.assertTrue(any("Wireless Controller" in value and "CONNECTED" in value for value in screen.drawn))
+
+    def test_powered_on_screen_does_not_list_mac_only_device(self):
+        mac_only = dict(DEVICE, alias=DEVICE["address"], paired=False)
+        screen = FakeScreen([27])
+        bluetooth.BluetoothMenu(screen, FakeClient([dict(ADAPTER_ON, devices=[mac_only])])).run()
+        self.assertFalse(any(DEVICE["address"] in value for value in screen.drawn))
 
     def test_scan_runs_until_escape_and_has_no_countdown(self):
         screen = FakeScreen([-1] * 200 + [27])

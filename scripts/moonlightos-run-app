@@ -33,7 +33,8 @@ esac
 ready=/run/moonlightos/$APP-ready
 status_file=/run/moonlightos/$APP-status
 active_file=/run/moonlightos/app-active
-rm -f -- "$request" "$ready" "$status_file"
+close_file=/run/moonlightos/close-$APP
+rm -f -- "$request" "$ready" "$status_file" "$close_file"
 
 write_status() {
   printf '%s\n' "$1" > "$status_file"
@@ -58,12 +59,14 @@ cleanup() {
     rm -f -- "$active_file"
   fi
   rm -f -- "$ready"
+  rm -f -- "$close_file"
 }
 trap cleanup EXIT INT TERM
 
 READY_REACHED=0
+CLOSE_REQUESTED=0
 run_client() {
-  "$@" &
+  setsid "$@" &
   local pid=$!
   for _ in $(seq 1 50); do
     if ! kill -0 "$pid" 2>/dev/null; then
@@ -76,12 +79,30 @@ run_client() {
   touch "$ready"
   write_status started
   echo "MOONLIGHTOS_APP_STARTED $APP"
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ -e "$close_file" ]]; then
+      CLOSE_REQUESTED=1
+      rm -f -- "$close_file"
+      kill -TERM -- "-$pid" 2>/dev/null || true
+      for _ in $(seq 1 50); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+      done
+      kill -KILL -- "-$pid" 2>/dev/null || true
+      break
+    fi
+    sleep 0.1
+  done
   wait "$pid"
 }
 
 printf '%s starting %s\n' "$(date --iso-8601=seconds)" "$APP"
 set +e
-if [[ "$APP" == moonlight ]]; then
+if [[ "$APP" == firefox ]]; then
+  /usr/libexec/moonlightos-firefox-drm-check || true
+  run_client "$binary"
+  rc=$?
+elif [[ "$APP" == moonlight ]]; then
   # The pinned Moonlight Qt payload includes XCB but no Wayland platform
   # plugin, so it runs through Cage's XWayland support.
   host=$(moonlightos-host-address --quiet 2>/dev/null || true)
@@ -112,11 +133,12 @@ elif [[ "$APP" == chiaki-ng ]]; then
     run_client env QT_QPA_PLATFORM=wayland SDL_AUDIODRIVER=pipewire "$binary"
   fi
   rc=$?
-else
-  run_client "$binary"
-  rc=$?
 fi
 set -e
+
+if ((CLOSE_REQUESTED == 1)); then
+  rc=0
+fi
 
 if ((READY_REACHED == 0)); then
   write_status "failed: exited before the application became ready (status $rc)"

@@ -1,0 +1,8 @@
+{
+  "policies": {
+    "EncryptedMediaExtensions": {
+      "Enabled": true,
+      "Locked": false
+    }
+  }
+}

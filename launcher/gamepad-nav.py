@@ -5,14 +5,18 @@ from __future__ import annotations
 
 import glob
 import pathlib
+import select
+import subprocess
+import threading
 import time
 
 from evdev import InputDevice, UInput, ecodes
 
 KEYS = [ecodes.KEY_UP, ecodes.KEY_DOWN, ecodes.KEY_LEFT, ecodes.KEY_RIGHT,
-        ecodes.KEY_ENTER, ecodes.KEY_ESC]
+        ecodes.KEY_ENTER, ecodes.KEY_ESC, ecodes.KEY_DELETE]
 OSK_ACTIVE = pathlib.Path("/run/moonlightos/osk-active")
 START_OSK = pathlib.Path("/run/moonlightos/start-osk")
+HOME_REQUEST = pathlib.Path("/run/moonlightos/home.request")
 _last_state_check = 0.0
 _last_state = False
 
@@ -53,6 +57,7 @@ def key_for_event(event) -> int | None:
         return {
             ecodes.BTN_SOUTH: ecodes.KEY_ENTER,
             ecodes.BTN_EAST: ecodes.KEY_ESC,
+            ecodes.BTN_WEST: ecodes.KEY_DELETE,
             ecodes.BTN_DPAD_UP: ecodes.KEY_UP,
             ecodes.BTN_DPAD_DOWN: ecodes.KEY_DOWN,
             ecodes.BTN_DPAD_LEFT: ecodes.KEY_LEFT,
@@ -66,34 +71,61 @@ def key_for_event(event) -> int | None:
     return None
 
 
-class KeyboardChord:
-    """Edge detector for Guide/Home + X/Square."""
+def is_home_event(event) -> bool:
+    return (
+        event.type == ecodes.EV_KEY
+        and event.value == 1
+        and event.code in {ecodes.KEY_HOME, ecodes.BTN_MODE}
+    )
 
-    def __init__(self) -> None:
-        self.pressed: set[int] = set()
-        self.latched = False
 
-    def update(self, event) -> bool:
-        if event.type != ecodes.EV_KEY:
-            return False
-        if event.value:
-            self.pressed.add(event.code)
-        else:
-            self.pressed.discard(event.code)
-        chord = {ecodes.BTN_MODE, ecodes.BTN_WEST} <= self.pressed
-        triggered = chord and not self.latched
-        self.latched = chord
-        return triggered
+def request_home() -> None:
+    HOME_REQUEST.touch()
+    try:
+        subprocess.run(
+            ["wlrctl", "toplevel", "focus", "title:MoonlightOS Launcher"],
+            check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def watch_home() -> None:
+    devices: dict[str, InputDevice] = {}
+    while True:
+        paths = set(glob.glob("/dev/input/event*"))
+        for path in set(devices) - paths:
+            devices.pop(path).close()
+        for path in paths - set(devices):
+            try:
+                device = InputDevice(path)
+                keys = set(device.capabilities().get(ecodes.EV_KEY, []))
+                if ecodes.KEY_HOME in keys or ecodes.BTN_MODE in keys:
+                    devices[path] = device
+                else:
+                    device.close()
+            except OSError:
+                pass
+        try:
+            readable, _writable, _errors = select.select(list(devices.values()), [], [], 1)
+            for device in readable:
+                for event in device.read():
+                    if is_home_event(event):
+                        request_home()
+        except OSError:
+            for device in devices.values():
+                device.close()
+            devices.clear()
 
 
 def run() -> None:
+    threading.Thread(target=watch_home, daemon=True).start()
     ui = UInput({ecodes.EV_KEY: KEYS}, name="MoonlightOS Launcher Navigation")
     while True:
         dev = find_gamepad()
         if dev is None:
             time.sleep(2)
             continue
-        chord = KeyboardChord()
         grabbed = False
         try:
             for event in dev.read_loop():
@@ -104,10 +136,6 @@ def run() -> None:
                         grabbed = active_osk
                     except OSError:
                         grabbed = False
-                if chord.update(event):
-                    if not active_osk:
-                        START_OSK.touch()
-                    continue
                 if app_active() and not active_osk:
                     continue
                 key = key_for_event(event)

@@ -9,6 +9,7 @@ User=moonlightos
 Group=moonlightos
 SupplementaryGroups=input
 Environment=XDG_RUNTIME_DIR=/run/moonlightos
+EnvironmentFile=-/run/moonlightos/session.env
 ExecStart=/usr/libexec/moonlightos-gamepad-nav
 Restart=on-failure
 RestartSec=2

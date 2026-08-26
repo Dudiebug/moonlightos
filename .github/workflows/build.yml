@@ -68,22 +68,16 @@ jobs:
             /tmp/moonlightos-qemu-persistence.log
           if-no-files-found: warn
           retention-days: 2
-      - name: Record ISO checksum
-        run: |
-          (cd build/out && sha256sum moonlightos-0.1.9-amd64.iso \
-            > moonlightos-0.1.9-amd64.iso.sha256)
       - name: Upload ISO
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.9-amd64
-          path: |
-            build/out/moonlightos-0.1.9-amd64.iso
-            build/out/moonlightos-0.1.9-amd64.iso.sha256
+          name: moonlightos-0.1.10-amd64
+          path: build/out/moonlightos-0.1.10-amd64.iso
           if-no-files-found: error
       - name: Upload release evidence
         uses: actions/upload-artifact@v7
         with:
-          name: moonlightos-0.1.9-evidence
+          name: moonlightos-0.1.10-evidence
           path: |
             /tmp/moonlightos-qemu-smoke.log
             /tmp/moonlightos-qemu-smoke.ppm

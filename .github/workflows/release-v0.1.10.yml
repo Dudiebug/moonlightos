@@ -1,0 +1,55 @@
+name: release-v0.1.10
+
+on:
+  workflow_run:
+    workflows: [build-and-smoke-test]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Check release eligibility
+        id: eligibility
+        run: echo "publish=$([[ $(< VERSION) == 0.1.10 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Download boot-tested ISO
+        if: steps.eligibility.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: moonlightos-0.1.10-amd64
+          path: dist
+          repository: Dudiebug/moonlightos
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Replace abandoned v0.1.10 release
+        if: steps.eligibility.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          test -s dist/moonlightos-0.1.10-amd64.iso
+          if gh release view 0.1.10 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete 0.1.10 --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          elif gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/0.1.10" >/dev/null 2>&1; then
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/0.1.10"
+          fi
+          gh release create 0.1.10 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --title "MoonlightOS v0.1.10" \
+            --notes-file docs/releases/v0.1.10.md \
+            dist/moonlightos-0.1.10-amd64.iso

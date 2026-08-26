@@ -201,6 +201,8 @@ def collect(bundle: pathlib.Path) -> None:
         pathlib.Path("/usr/share/moonlightos/build-info"),
     )
     write_text(bundle / "system/date-utc.txt", generated + "\n")
+    add_command(bundle, "system/time-synchronization.txt", ["timedatectl", "show"])
+    add_command(bundle, "system/ca-certificates.txt", ["dpkg-query", "-W", "ca-certificates"])
     add_command(bundle, "system/uptime.txt", ["uptime"])
     add_file(bundle, "system/kernel-command-line.txt", pathlib.Path("/proc/cmdline"))
     add_command(bundle, "system/kernel-version.txt", ["uname", "-a"])
@@ -262,6 +264,12 @@ def collect(bundle: pathlib.Path) -> None:
         user_command(["wpctl", "status"], environment),
         env=environment,
     )
+    add_command(
+        bundle,
+        "audio/default-sink.txt",
+        user_command(["wpctl", "inspect", "@DEFAULT_AUDIO_SINK@"], environment),
+        env=environment,
+    )
     add_command(bundle, "audio/alsa-devices.txt", ["aplay", "-l"])
     add_command(bundle, "network/networkmanager.txt", ["nmcli", "device", "show"])
     add_command(bundle, "network/ipv4-addresses.txt", ["ip", "-4", "address", "show"])
@@ -288,6 +296,25 @@ def collect(bundle: pathlib.Path) -> None:
     except json.JSONDecodeError:
         tailscale_text = redact_text(tailscale_raw)
     write_text(bundle / "network/tailscale-sanitized.json", tailscale_text)
+    bluetooth_devices = command_output(["bluetoothctl", "devices"])
+    named_devices = []
+    for line in bluetooth_devices.splitlines():
+        match = re.match(r"Device\s+(?:[0-9A-F]{2}:){5}[0-9A-F]{2}\s+(.+)$", line, re.IGNORECASE)
+        if not match:
+            continue
+        name = match.group(1).strip()
+        compact = re.sub(r"[^0-9A-Fa-f]", "", name)
+        if name and not (len(compact) == 12 and re.fullmatch(r"[0-9A-Fa-f]{12}", compact)):
+            named_devices.append(name)
+    write_text(
+        bundle / "bluetooth/named-devices.txt",
+        "\n".join(named_devices) + ("\n" if named_devices else "No named devices reported.\n"),
+    )
+    add_command(bundle, "bluetooth/adapter.txt", ["bluetoothctl", "show"])
+    add_command(
+        bundle, "bluetooth/services.txt",
+        ["systemctl", "--no-pager", "--full", "status", "bluetooth", "moonlightos-bluetooth"],
+    )
     add_command(bundle, "usbip/state.txt", ["moonlightos-usbip", "status"])
     add_command(bundle, "firewall/nftables-ruleset.txt", ["nft", "list", "ruleset"])
     add_command(
@@ -299,6 +326,7 @@ def collect(bundle: pathlib.Path) -> None:
             "-f=${binary:Package}\t${Version}\n",
             "cage",
             "firefox-esr",
+            "libavcodec61",
             "linux-image-amd64",
             "mesa-vulkan-drivers",
             "network-manager",
@@ -306,6 +334,7 @@ def collect(bundle: pathlib.Path) -> None:
             "tailscale",
             "usbip",
             "wireplumber",
+            "wlrctl",
             "wlr-randr",
             "wpasupplicant",
             "xwayland",
@@ -326,6 +355,23 @@ def collect(bundle: pathlib.Path) -> None:
         "software/applications-sanitized.txt",
         ["/usr/bin/python3", "/usr/libexec/moonlightos_apps.py"],
     )
+    add_command(bundle, "firefox/package-source.txt", ["apt-cache", "policy", "firefox-esr"])
+    add_file(bundle, "firefox/eme-widevine-status.txt", RUN / "firefox-drm-status")
+    add_file(bundle, "firefox/eme-policy.json", pathlib.Path("/etc/firefox/policies/policies.json"))
+    managed = []
+    running_ids = [
+        path.name.removesuffix("-ready") for path in sorted(RUN.glob("*-ready"))
+        if (RUN / f"{path.name.removesuffix('-ready')}-status").is_file()
+    ]
+    for app_id in running_ids:
+        managed.append(f"{app_id}: running")
+        path = RUN / f"{app_id}-status"
+        try:
+            value = path.read_text(encoding="utf-8", errors="replace").splitlines()[0][:160]
+        except (OSError, IndexError):
+            continue
+        managed.append(f"{app_id}: {value}")
+    write_text(bundle / "session/managed-applications.txt", "\n".join(managed) + ("\n" if managed else "None running.\n"))
     add_command(
         bundle,
         "services/moonlightos-services.txt",

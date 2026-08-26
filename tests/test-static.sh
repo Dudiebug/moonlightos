@@ -64,17 +64,16 @@ find "$boot_test" -depth -delete
 
 rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
-[[ "$(< VERSION)" == 0.1.9 ]]
+[[ "$(< VERSION)" == 0.1.10 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.9-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
-rg -q 'cd build/out && sha256sum moonlightos-0\.1\.9-amd64\.iso' .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.10-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+! rg -qi 'sha-?256|sha256|\.sha256' .github/workflows/build.yml .github/workflows/release-v0.1.10.yml
 rg -q 'sudo chown -R .*build/out' .github/workflows/build.yml
-rg -q '^  actions: read$' .github/workflows/release-v0.1.9.yml
-rg -q 'git/matching-refs/tags/0\.1\.9' .github/workflows/release-v0.1.9.yml
-rg -q 'docs/releases/v0\.1\.9\.md' .github/workflows/release-v0.1.9.yml
-rg -q -- '--draft' .github/workflows/release-v0.1.9.yml
-rg -q 'already public; refusing to replace its assets' .github/workflows/release-v0.1.9.yml
-! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.9.yml
+rg -q '^  actions: read$' .github/workflows/release-v0.1.10.yml
+rg -q 'git/refs/tags/0\.1\.10' .github/workflows/release-v0.1.10.yml
+rg -q 'docs/releases/v0\.1\.10\.md' .github/workflows/release-v0.1.10.yml
+rg -q 'release delete 0\.1\.10.*--cleanup-tag' .github/workflows/release-v0.1.10.yml
+! rg -q 'git/ref/tags/v1\.1' .github/workflows/release-v0.1.10.yml
 rg -q '^ipv6.method=disabled$' overlay/etc/NetworkManager/conf.d/10-moonlightos.conf
 rg -q '^net.ipv6.conf.all.disable_ipv6=1$' overlay/etc/sysctl.d/90-moonlightos.conf
 ! rg -q 'moonlightos-network-ready.service' services/moonlightos-launcher.service
@@ -100,6 +99,9 @@ rg -q 'unsquashfs -quiet -offset' build/configure.sh
 removed_units='moonlightos-escape''-guard|moonlightos-stop''-active-app'
 ! rg -q "$removed_units" build/configure.sh
 rg -q '^firefox-esr$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^libavcodec61$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^systemd-timesyncd$' config/live-build/package-lists/moonlightos.list.chroot
+rg -q '^wlrctl$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^wpasupplicant$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^qrencode$' config/live-build/package-lists/moonlightos.list.chroot
 rg -q '^bluez$' config/live-build/package-lists/moonlightos.list.chroot
@@ -139,7 +141,13 @@ rg -q '^ExecStart=/usr/libexec/moonlightos-support-export$' services/moonlightos
 removed_feature='TRIPLE[- ]?TAP|triple[- ]?tap|escape''-guard|stop''-active-app'
 ! rg -q -g '!build/work/**' -g '!build/out/**' -g '!tests/test-static.sh' \
   "$removed_feature" launcher scripts services build config docs tests
-rg -q 'EXIT THE APP TO RETURN' launcher/moonlightos-launcher.py
+rg -q 'ACTIVE APPLICATIONS' launcher/moonlightos-launcher.py
+rg -q 'close-{app.status_id}' launcher/moonlightos-launcher.py
+rg -q 'KEY_HOME.*BTN_MODE' launcher/gamepad-nav.py
+rg -q 'wlrctl.*toplevel.*focus' launcher/gamepad-nav.py
+rg -q 'named_devices' launcher/moonlightos_bluetooth.py
+rg -q 'wpctl.*set-default' launcher/moonlightos_audio.py
+rg -q 'EncryptedMediaExtensions' overlay/etc/firefox/policies/policies.json
 rg -q 'WILL MOUNT TEMPORARILY' launcher/moonlightos_support.py
 rg -q 'InaccessiblePaths=.*\/var\/lib\/moonlightos\/home.*\/var\/lib\/tailscale.*-\/var\/lib\/bluetooth' services/moonlightos-support-export.service
 rg -q '^RuntimeDirectoryMode=0700$' services/moonlightos-bluetooth.service
@@ -210,7 +218,7 @@ rg -q 'MIN_FREE' scripts/moonlightos-support-export
 python3 -m py_compile launcher/moonlightos-launcher.py launcher/moonlightos_apps.py \
   launcher/moonlightos_app_runner.py launcher/moonlightos_setup.py launcher/moonlightos_osk.py \
   launcher/moonlightos_display.py launcher/moonlightos_support.py \
-  launcher/moonlightos_bluetooth.py launcher/gamepad-nav.py \
+  launcher/moonlightos_bluetooth.py launcher/moonlightos_audio.py launcher/gamepad-nav.py \
   scripts/moonlightos-host-address scripts/moonlightos-support-export \
   scripts/moonlightos-bluetoothd
 
