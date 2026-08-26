@@ -142,7 +142,7 @@ removed_feature='TRIPLE[- ]?TAP|triple[- ]?tap|escape''-guard|stop''-active-app'
 ! rg -q -g '!build/work/**' -g '!build/out/**' -g '!tests/test-static.sh' \
   "$removed_feature" launcher scripts services build config docs tests
 rg -q 'ACTIVE APPLICATIONS' launcher/moonlightos-launcher.py
-rg -q 'close-{app.status_id}' launcher/moonlightos-launcher.py
+rg -Fq 'close-{app.status_id}' launcher/moonlightos-launcher.py
 rg -q 'KEY_HOME.*BTN_MODE' launcher/gamepad-nav.py
 rg -q 'wlrctl.*toplevel.*focus' launcher/gamepad-nav.py
 rg -q 'named_devices' launcher/moonlightos_bluetooth.py
