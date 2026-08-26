@@ -1,4 +1,4 @@
-name: release-v0.1.10
+name: release-v0.1.11
 
 on:
   workflow_run:
@@ -23,34 +23,34 @@ jobs:
 
       - name: Check release eligibility
         id: eligibility
-        run: echo "publish=$([[ $(< VERSION) == 0.1.10 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        run: echo "publish=$([[ $(< VERSION) == 0.1.11 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Download boot-tested ISO
         if: steps.eligibility.outputs.publish == 'true'
         uses: actions/download-artifact@v8
         with:
-          name: moonlightos-0.1.10-amd64
+          name: moonlightos-0.1.11-amd64
           path: dist
           repository: Dudiebug/moonlightos
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Replace abandoned v0.1.10 release
+      - name: Publish v0.1.11 release
         if: steps.eligibility.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          test -s dist/moonlightos-0.1.10-amd64.iso
-          if gh release view 0.1.10 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete 0.1.10 --repo "$GITHUB_REPOSITORY" --yes
+          test -s dist/moonlightos-0.1.11-amd64.iso
+          if gh release view 0.1.11 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete 0.1.11 --repo "$GITHUB_REPOSITORY" --yes
           fi
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/0.1.10" >/dev/null 2>&1; then
-            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/0.1.10"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/0.1.11" >/dev/null 2>&1; then
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/0.1.11"
           fi
-          gh release create 0.1.10 \
+          gh release create 0.1.11 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$RELEASE_SHA" \
-            --title "MoonlightOS v0.1.10" \
-            --notes-file docs/releases/v0.1.10.md \
-            dist/moonlightos-0.1.10-amd64.iso
+            --title "MoonlightOS v0.1.11" \
+            --notes-file docs/releases/v0.1.11.md \
+            dist/moonlightos-0.1.11-amd64.iso

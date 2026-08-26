@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ISO=${1:-$ROOT/build/out/moonlightos-0.1.10-amd64.iso}
+ISO=${1:-$ROOT/build/out/moonlightos-0.1.11-amd64.iso}
 LOG=${MOONLIGHTOS_QEMU_PERSISTENCE_LOG:-/tmp/moonlightos-qemu-persistence.log}
 
 for command in qemu-system-x86_64 xorriso mke2fs; do
