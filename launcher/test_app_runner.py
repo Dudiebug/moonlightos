@@ -107,7 +107,7 @@ class RunnerTest(unittest.TestCase):
             request.write_text("demo\n")
             handlers = {}
             process = mock.Mock(pid=123)
-            process.poll.side_effect = [None, None, 0]
+            process.poll.side_effect = [None, None, 0, None]
             process.wait.side_effect = lambda: (handlers[runner.signal.SIGTERM](runner.signal.SIGTERM, None), -15)[1]
 
             def install(signum, handler):
@@ -135,7 +135,7 @@ class RunnerTest(unittest.TestCase):
             request = root / "request"
             request.write_text("demo\n")
             process = mock.Mock(pid=321)
-            process.poll.side_effect = [None, None]
+            process.poll.return_value = None
             process.wait.return_value = -15
 
             def mark_close(*_args, **_kwargs):
