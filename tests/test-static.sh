@@ -66,7 +66,7 @@ rg -q -- '--uefi-secure-boot enable' build/build.sh
 rg -q -- "--bootappend-live '.*ipv6.disable=1" build/build.sh
 [[ "$(< VERSION)" == 0.1.11 ]]
 cmp -s VERSION overlay/etc/moonlightos-version
-rg -q 'moonlightos-0\.1\.10-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
+rg -q 'moonlightos-0\.1\.11-amd64\.iso' Makefile build/build.sh .github/workflows/build.yml
 ! rg -qi 'sha-?256|sha256|\.sha256' .github/workflows/build.yml .github/workflows/release-v0.1.11.yml
 rg -q 'sudo chown -R .*build/out' .github/workflows/build.yml
 rg -q '^  actions: read$' .github/workflows/release-v0.1.11.yml
